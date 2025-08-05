@@ -125,6 +125,7 @@ namespace InputViewer
             {
                 Auto_Save();
             }
+            /*
 #if DEBUG
             if (Input.GetKeyDown(KeyCode.Keypad7))
             {
@@ -136,8 +137,10 @@ namespace InputViewer
                 Load_InputViewerPosition();
             }
 #endif
+            */
 
             //Experimental Code - not much to see here.
+            /*
 #if DEBUG
             if (Input.GetKeyDown(KeyCode.Alpha9))
             {
@@ -181,6 +184,7 @@ namespace InputViewer
                 frameVertGroup.childForceExpandWidth = true;
             }
 #endif
+            */
         }
 
         Vector2 inputSizeMini = new Vector2(165, 117);
