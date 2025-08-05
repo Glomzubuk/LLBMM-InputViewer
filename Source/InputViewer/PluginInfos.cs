@@ -1,17 +1,6 @@
 ﻿using System.Reflection;
 using InputViewer;
 
-#region Assembly attributes
-/*
- * These attributes define various metainformation of the generated DLL.
- * In general, you don't need to touch these. Instead, edit the values in PluginInfos. 
- */
-[assembly: AssemblyVersion(PluginInfos.PLUGIN_VERSION)]
-[assembly: AssemblyFileVersion(PluginInfos.PLUGIN_VERSION)]
-[assembly: AssemblyTitle(PluginInfos.PLUGIN_NAME + " (" + PluginInfos.PLUGIN_ID + ")")]
-[assembly: AssemblyProduct(PluginInfos.PLUGIN_NAME)]
-#endregion
-
 namespace InputViewer
 {
     /// <summary>
