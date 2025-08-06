@@ -13,20 +13,29 @@ namespace InputViewer
 
         private static int _windowID = 10000;
         private static int WindowID => _windowID++;
+        
+        private static ConfigEntry<bool> scaleToResolution;
+        private static ConfigEntry<bool> isMiniSize;
 
         private Player boundPlayer;
         private ConfigEntry<Vector2> savedPosition;
-        private ConfigEntry<bool> scaleToResolution;
-        private ConfigEntry<bool> isMiniSize;
         private int localWindowID;
+        private bool forceMiniSize;
+        private bool isDraggable;
 
         public Rect inputRect = new Rect(0, 0, inputSize.x, inputSize.y);
 
-        public void Initialize(ConfigEntry<Vector2> savedPosition, ConfigEntry<bool> scaleToResolution, ConfigEntry<bool> excludeExpressions)
+        public static void BindConfigs(ConfigEntry<bool> scaleToResolution, ConfigEntry<bool> isMiniSize)
+        {
+            InputWindow.scaleToResolution = scaleToResolution;
+            InputWindow.isMiniSize = isMiniSize;
+        }
+
+        public void Initialize(ConfigEntry<Vector2> savedPosition, bool isDraggable = true, bool forceMiniSize = false)
         {
             this.savedPosition = savedPosition;
-            this.scaleToResolution = scaleToResolution;
-            isMiniSize = excludeExpressions;
+            this.isDraggable = isDraggable;
+            this.forceMiniSize = forceMiniSize;
             localWindowID = WindowID;
             
             inputRect.position = savedPosition.Value;
@@ -60,7 +69,7 @@ namespace InputViewer
                 GUITools.ScaleGUIToViewPort();
             }
             
-            inputRect.size = isMiniSize.Value ? inputSizeMini : inputSize;
+            inputRect.size = (isMiniSize.Value || forceMiniSize) ? inputSizeMini : inputSize;
             inputRect = GUILayout.Window(localWindowID, inputRect, DrawWindow, "", IVStyle.InputViewerBG);
         }
 
@@ -89,13 +98,17 @@ namespace InputViewer
                 GUILayout.MaxWidth(inputRect.size.x),
                 GUILayout.MaxHeight(inputRect.size.y)
             ];
-            
-            GUI.DragWindow();
+
+            if (isDraggable)
+            {
+                GUI.DragWindow();
+            }
+
             GUILayout.BeginHorizontal(borderStyle, layoutOptions);
             
             GUILayout.BeginVertical();
             
-            GUILayout.Label(isMiniSize.Value ? "Inputs" : "Input Viewer", headerStyle);
+            GUILayout.Label((isMiniSize.Value || forceMiniSize) ? "Inputs" : "Input Viewer", headerStyle);
             GUILayout.BeginHorizontal();
             
             GUILayout.BeginVertical();
@@ -124,7 +137,7 @@ namespace InputViewer
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
 
-            if (!isMiniSize.Value) // should include taunt expressions
+            if (!(isMiniSize.Value || forceMiniSize)) // should include taunt expressions
             {
                 GUILayout.BeginVertical();
                 GUILayout.FlexibleSpace();

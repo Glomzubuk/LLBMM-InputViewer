@@ -23,6 +23,13 @@ namespace InputViewer
         public static InputViewer Instance { get; private set; } = null;
         
         private InputWindow InputWindow_Main;
+        private InputWindow InputWindow_1v1_Left;
+        private InputWindow InputWindow_1v1_Right;
+        private InputWindow InputWindow_FFA_P1;
+        private InputWindow InputWindow_FFA_P2;
+        private InputWindow InputWindow_FFA_P3;
+        private InputWindow InputWindow_FFA_P4;
+        private InputWindow[] PlayerInputWindows;
         private InputWindow[] AllInputWindows;
 
         private float saveTimer;
@@ -33,6 +40,12 @@ namespace InputViewer
         public ConfigEntry<bool> excludeExpressions;
         
         public ConfigEntry<Vector2> inputViewerPosition_main;
+        public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
+        public ConfigEntry<Vector2> inputViewerPosition_1v1_right;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P1;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P2;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P3;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P4;
 
         void ConfigInit()
         {
@@ -45,6 +58,18 @@ namespace InputViewer
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
 
             inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
+            
+            inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(30, GUITools.GUI_Height - 147));
+            inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(GUITools.GUI_Width - InputWindow.inputSize.x - 30, GUITools.GUI_Height - 147));
+
+            inputViewerPosition_FFA_P1 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P1",
+                new Vector2(20, GUITools.GUI_Height - 147));
+            inputViewerPosition_FFA_P2 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P2",
+                new Vector2(20*2 + InputWindow.inputSizeMini.x, GUITools.GUI_Height - 147));
+            inputViewerPosition_FFA_P3 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P3",
+                new Vector2(GUITools.GUI_Width - InputWindow.inputSizeMini.x*2 - 20*2, GUITools.GUI_Height - 147));
+            inputViewerPosition_FFA_P4 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P4",
+                new Vector2(GUITools.GUI_Width - InputWindow.inputSizeMini.x - 20, GUITools.GUI_Height - 147));
         }
 
         void Awake()
@@ -53,10 +78,27 @@ namespace InputViewer
             IVStyle.ATInit();
             ConfigInit();
 
-            InputWindow_Main = gameObject.AddComponent<InputWindow>();
-            InputWindow_Main.Initialize(inputViewerPosition_main, scaleToResolution, excludeExpressions);
+            InputWindow.BindConfigs(scaleToResolution, excludeExpressions);
             
-            AllInputWindows = [InputWindow_Main];
+            InputWindow_Main = gameObject.AddComponent<InputWindow>();
+            InputWindow_Main.Initialize(inputViewerPosition_main);
+            
+            InputWindow_1v1_Left = gameObject.AddComponent<InputWindow>();
+            InputWindow_1v1_Left.Initialize(inputViewerPosition_1v1_left, false);
+            InputWindow_1v1_Right = gameObject.AddComponent<InputWindow>();
+            InputWindow_1v1_Right.Initialize(inputViewerPosition_1v1_right, false);
+            
+            InputWindow_FFA_P1 = gameObject.AddComponent<InputWindow>();
+            InputWindow_FFA_P1.Initialize(inputViewerPosition_FFA_P1, false, true);
+            InputWindow_FFA_P2 = gameObject.AddComponent<InputWindow>();
+            InputWindow_FFA_P2.Initialize(inputViewerPosition_FFA_P2, false, true);
+            InputWindow_FFA_P3 = gameObject.AddComponent<InputWindow>();
+            InputWindow_FFA_P3.Initialize(inputViewerPosition_FFA_P3, false, true);
+            InputWindow_FFA_P4 = gameObject.AddComponent<InputWindow>();
+            InputWindow_FFA_P4.Initialize(inputViewerPosition_FFA_P4, false, true);
+            
+            PlayerInputWindows = [InputWindow_FFA_P1, InputWindow_FFA_P2, InputWindow_FFA_P3, InputWindow_FFA_P4];
+            AllInputWindows = [InputWindow_Main,  InputWindow_1v1_Left, InputWindow_1v1_Right,  InputWindow_FFA_P1, InputWindow_FFA_P2,  InputWindow_FFA_P3, InputWindow_FFA_P4];
         }
 
         private void Start()
@@ -206,15 +248,46 @@ namespace InputViewer
 
         private void LateUpdate()
         {
-            InputWindow_Main.BindPlayer(GetFirstLocalPlayer());
-            
-            if (ViewingMode((ViewMode)selectViewingMode.Value) || ModDependenciesUtils.InModOptions())
+            foreach (InputWindow window in AllInputWindows)
             {
+                window.enabled = false;
+            }
+            
+            int localPlayerCount = LocalPlayerCount;
+
+            // training, local with CPUs, online
+            if ((localPlayerCount == 1 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
+            {
+                InputWindow_Main.BindPlayer(GetFirstLocalPlayer());
+            
                 InputWindow_Main.enabled = true;
             }
-            else
+            else if (localPlayerCount == 2 && InGame)
             {
-                InputWindow_Main.enabled = false;
+                Player leftPLayer = GetFirstLocalPlayer();
+                Player rightPlayer = GetSecondLocalPlayer(leftPLayer);
+                
+                InputWindow_1v1_Left.BindPlayer(leftPLayer);
+                InputWindow_1v1_Right.BindPlayer(rightPlayer);
+
+                InputWindow_1v1_Left.enabled = true;
+                InputWindow_1v1_Right.enabled = true;
+            }
+            else if (localPlayerCount > 2 && InGame)
+            {
+                for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
+                {
+                    Player player = Player.GetPlayer(playerIndex);
+
+                    if (!IsLocalPlayer(player))
+                    {
+                        continue;
+                    }
+
+                    InputWindow window = PlayerInputWindows[playerIndex];
+                    window.BindPlayer(player);
+                    window.enabled = true;
+                }
             }
         }
 
@@ -234,13 +307,13 @@ namespace InputViewer
                 case ViewMode.Off:
                     return false;
                 case ViewMode.Training:
-                    return StateApi.CurrentGameMode == GameMode.TRAINING && InGame;
+                    return StateApi.CurrentGameMode == GameMode.TRAINING;
                 case ViewMode.local:
-                    return !NetworkApi.IsOnline && InGame;
+                    return !NetworkApi.IsOnline;
                 case ViewMode.Online:
-                    return NetworkApi.IsOnline && InGame;
+                    return NetworkApi.IsOnline;
                 case ViewMode.All:
-                    return InGame;
+                    return true;
                 default:
                     return false;
             }
@@ -250,11 +323,47 @@ namespace InputViewer
         {
             return player.IsLocalPeer && player.IsInMatch && !player.IsAI;
         }
+        
+        private int LocalPlayerCount
+        {
+            get
+            {
+                int count = 0;
+                
+                for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
+                {
+                    Player player = Player.GetPlayer(playerIndex);
+
+                    if (IsLocalPlayer(player))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
 
         private Player GetFirstLocalPlayer()
         {
             Player localPlayer = Player.GetPlayer(0);
             for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
+            {
+                Player tempPlayer = Player.GetPlayer(playerIndex);
+                if (IsLocalPlayer(tempPlayer))
+                {
+                    localPlayer = tempPlayer;
+                    break;
+                }
+            }
+
+            return localPlayer;
+        }
+        
+        private Player GetSecondLocalPlayer(Player firstPlayer)
+        {
+            Player localPlayer = Player.GetPlayer(0);
+            for (int playerIndex = firstPlayer.nr + 1; playerIndex < Player.MAX_PLAYERS; playerIndex++)
             {
                 Player tempPlayer = Player.GetPlayer(playerIndex);
                 if (IsLocalPlayer(tempPlayer))
