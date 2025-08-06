@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using LLHandlers;
 using LLModdingTools;
 using LLScreen;
 using UnityEngine;
@@ -20,24 +19,44 @@ namespace InputViewer
     [BepInProcess("LLBlaze.exe")]
     class InputViewer : BaseUnityPlugin
     {
-
-#pragma warning disable IDE0051 // Remove unused private members
-        public const string modVersion = "1.2.0";
-        private const string repositoryOwner = "Daioutzu";
-        private const string repositoryName = "LLBMM-InputViewer";
-#pragma warning restore IDE0051
-
+        
         public static InputViewer Instance { get; private set; } = null;
-
+        
+        private InputWindow InputWindow_Main;
+        private InputWindow[] AllInputWindows;
 
         private float saveTimer;
+        
+        public ConfigEntry<int> selectViewingMode;
+        public ConfigEntry<int> backgroundTransparency;
+        public ConfigEntry<bool> scaleToResolution;
+        public ConfigEntry<bool> excludeExpressions;
+        
+        public ConfigEntry<Vector2> inputViewerPosition_main;
+
+        void ConfigInit()
+        {
+            selectViewingMode = Config.Bind<int>("General", "selectViewingMode", 4,
+                new ConfigDescription("Viewing mode index", new AcceptableValueRange<int>(0, 4)));
+            backgroundTransparency = Config.Bind<int>("General", "backgroundTransparency", 0,
+                new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
+
+            scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", false);
+            excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
+
+            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
+        }
 
         void Awake()
         {
             Instance = this;
             IVStyle.ATInit();
             ConfigInit();
-            inputRect.position = inputViewerPosition.Value;
+
+            InputWindow_Main = gameObject.AddComponent<InputWindow>();
+            InputWindow_Main.Initialize(inputViewerPosition_main, scaleToResolution, excludeExpressions);
+            
+            AllInputWindows = [InputWindow_Main];
         }
 
         private void Start()
@@ -60,25 +79,7 @@ namespace InputViewer
         }
 
         bool InGame => World.instance != null && (GameStates.GetCurrent() == GameState.GAME || GameStates.GetCurrent() == GameState.GAME_PAUSE) && !UIScreen.loadingScreenActive;
-
-        public ConfigEntry<int> selectViewingMode;
-        public ConfigEntry<int> backgroundTransparency;
-        public ConfigEntry<bool> scaleToResolution;
-        public ConfigEntry<bool> excludeExpressions;
-        public ConfigEntry<Vector2> inputViewerPosition;
-
-        void ConfigInit()
-        {
-            selectViewingMode = Config.Bind<int>("General", "selectViewingMode", 4,
-                new ConfigDescription("Viewing mode index", new AcceptableValueRange<int>(0, 4)));
-            backgroundTransparency = Config.Bind<int>("General", "backgroundTransparency", 0,
-                new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
-
-            scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", false);
-            excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
-
-            inputViewerPosition = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
-        }
+        
 #if DEBUG
         //Method to Log all the active game objects
         void PrintAllGameObjects()
@@ -95,14 +96,30 @@ namespace InputViewer
 
         void Auto_Save()
         {
-            if (inputRect.position != inputViewerPosition.Value)
+            bool needsSave = false;
+            
+            foreach (InputWindow window in AllInputWindows)
             {
-                saveTimer += Time.deltaTime;
-                if (CountDown(ref saveTimer, 5f))
+                if (window.IsPositionUnsaved())
                 {
-                    inputViewerPosition.Value = inputRect.position;
-                    Config.Save();
+                    needsSave = true;
                 }
+            }
+
+            if (!needsSave)
+            {
+                return;
+            }
+
+            saveTimer += Time.deltaTime;
+            if (CountDown(ref saveTimer, 5f))
+            {
+                foreach (InputWindow window in AllInputWindows)
+                {
+                    window.SavePosition();
+                }
+
+                Config.Save();
             }
         }
 
@@ -187,22 +204,17 @@ namespace InputViewer
             */
         }
 
-        Vector2 inputSizeMini = new Vector2(165, 117);
-        Vector2 inputSize = new Vector2(300, 117);
-        Rect inputRect = new Rect(30, GUITools.GUI_Height - 147, 300, 117);
-
-        void OnGUI()
+        private void LateUpdate()
         {
-            if (scaleToResolution.Value)
-            {
-                GUITools.ScaleGUIToViewPort();
-            }
-            //TODO Remove hard dep to modmenu for LLBMM compatibility
+            InputWindow_Main.BindPlayer(GetFirstLocalPlayer());
+            
             if (ViewingMode((ViewMode)selectViewingMode.Value) || ModDependenciesUtils.InModOptions())
             {
-                inputRect.size = excludeExpressions.Value ? inputSizeMini : inputSize;
-
-                inputRect = GUILayout.Window(102289, inputRect, InputWindow, "", IVStyle.InputViewerBG);
+                InputWindow_Main.enabled = true;
+            }
+            else
+            {
+                InputWindow_Main.enabled = false;
             }
         }
 
@@ -234,112 +246,25 @@ namespace InputViewer
             }
         }
 
-        void InputWindow(int wId)
+        private bool IsLocalPlayer(Player player)
         {
-            Player player = Player.GetPlayer(0);
-            for (int i = 0; i < 4; i++)
+            return player.IsLocalPeer && player.IsInMatch && !player.IsAI;
+        }
+
+        private Player GetFirstLocalPlayer()
+        {
+            Player localPlayer = Player.GetPlayer(0);
+            for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
             {
-                var tmpPlayer = Player.GetPlayer(i);
-                if (tmpPlayer.IsLocalPeer && tmpPlayer.IsInMatch)
+                Player tempPlayer = Player.GetPlayer(playerIndex);
+                if (IsLocalPlayer(tempPlayer))
                 {
-                    player = tmpPlayer;
+                    localPlayer = tempPlayer;
                     break;
                 }
-            };
-
-            GUIStyle headerStyle = new GUIStyle(GUI.skin.label)
-            {
-                font = IVStyle.inputViewerFont,
-                fontSize = 20,
-                alignment = TextAnchor.MiddleLeft,
-                margin = new RectOffset(5, 5, 6, 16),
-                padding = new RectOffset(0, 0, 0, 0),
-                wordWrap = false,
-                clipping = TextClipping.Overflow,
-            };
-
-            GUIStyle border = new GUIStyle()
-            {
-                padding = new RectOffset(3, 3, 0, 0),
-            };
-
-            GUI.DragWindow();
-            GUILayoutOption[] gUILayoutOption = new GUILayoutOption[]
-            {
-                GUILayout.MinWidth(inputRect.size.x),
-                GUILayout.MinHeight(inputRect.size.y),
-                GUILayout.MaxWidth(inputRect.size.x),
-                GUILayout.MaxHeight(inputRect.size.y),
-            };
-            GUILayout.BeginHorizontal(border, gUILayoutOption);
-
-            GUILayout.BeginVertical();
-            GUILayout.Label(excludeExpressions.Value ? "Inputs" : "Input Viewer", headerStyle);
-            GUILayout.BeginHorizontal();
-
-            GUILayout.BeginVertical();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.JUMP), "", IVStyle.JumpStyle);
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.UP), "", IVStyle.DirUpStyle);
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.JUMP)] == 100, "", IVStyle.JumpStyle);
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.UP)] == 100, "", IVStyle.DirUpStyle);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.LEFT), "", IVStyle.DirLefStyle);
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.DOWN), "", IVStyle.DirDwnStyle);
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.RIGHT), "", IVStyle.DirRigStyle);
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.LEFT)] == 100, "", IVStyle.DirLefStyle);
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.DOWN)] == 100, "", IVStyle.DirDwnStyle);
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.RIGHT)] == 100, "", IVStyle.DirRigStyle);
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.SWING), "", IVStyle.SwingStyle); //Swing Button
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.BUNT), "", IVStyle.BuntStyle); //Bunt Button
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.SWING)] == 100, "", IVStyle.SwingStyle); //Swing Button
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.BUNT)] == 100, "", IVStyle.BuntStyle); //Bunt Button
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.GRAB), "", IVStyle.GrabStyle); //Grab Button
-            GUILayout.Toggle(InputHandler.GetInput(player, InputAction.TAUNT), "", IVStyle.TauntStyle); //Taunt Button
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.GRAB)] == 100, "", IVStyle.GrabStyle); //Grab Button
-            //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.TAUNT)] == 100, "", IVStyle.TauntStyle); //Taunt Button
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
-
-            GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
-            if (excludeExpressions.Value == false)
-            {
-                GUILayout.BeginVertical();
-                GUILayout.FlexibleSpace();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.GetInput(player, InputAction.EXPRESS_UP), "", IVStyle.ExpNiceStyle);
-                //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_UP)] == 100, "", IVStyle.ExpNiceStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.GetInput(player, InputAction.EXPRESS_LEFT), "", IVStyle.ExpOopsStyle);
-                GUILayout.Toggle(InputHandler.GetInput(player, InputAction.EXPRESS_RIGHT), "", IVStyle.ExpWowStyle);
-                //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_LEFT)] == 100, "", IVStyle.ExpOopsStyle);
-                //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_RIGHT)] == 100, "", IVStyle.ExpWowStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.GetInput(player, InputAction.EXPRESS_DOWN), "", IVStyle.ExpBringItStyle);
-                //GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_DOWN)] == 100, "", IVStyle.ExpBringItStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.EndVertical();
             }
-            GUILayout.EndHorizontal();
+
+            return localPlayer;
         }
 
     }
