@@ -6,6 +6,7 @@ using UnityEngine;
 using BepInEx;
 using BepInEx.Configuration;
 using LLBML;
+using LLBML.GameEvents;
 using LLBML.Players;
 using LLBML.States;
 using LLBML.Networking;
@@ -16,9 +17,13 @@ namespace InputViewer
     [BepInPlugin(PluginInfos.PLUGIN_ID, PluginInfos.PLUGIN_NAME, PluginInfos.PLUGIN_VERSION)]
     [BepInDependency(LLBML.PluginInfos.PLUGIN_ID, BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("no.mrgentle.plugins.llb.modmenu", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency(DEPENDENCY_COLORSWAP, BepInDependency.DependencyFlags.SoftDependency)]
     [BepInProcess("LLBlaze.exe")]
     class InputViewer : BaseUnityPlugin
     {
+
+        public const string DEPENDENCY_COLORSWAP = "com.gitlab.axolotlll.llb-colorswap";
+        public BaseUnityPlugin ColorSwapPlugin = null;
         
         public static InputViewer Instance { get; private set; } = null;
         
@@ -33,6 +38,7 @@ namespace InputViewer
         private InputWindow[] AllInputWindows;
 
         private float saveTimer;
+        private bool regenerateColorTextures;
         
         public ConfigEntry<int> selectViewingMode;
         public ConfigEntry<int> backgroundTransparency;
@@ -40,6 +46,7 @@ namespace InputViewer
         public ConfigEntry<bool> excludeExpressions;
         public ConfigEntry<bool> trackCPUPlayers;
         public ConfigEntry<bool> useTeamColors;
+        public ConfigEntry<bool> enableColorSwapIntegration;
         
         public ConfigEntry<Vector2> inputViewerPosition_main;
         public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
@@ -61,6 +68,7 @@ namespace InputViewer
 
             trackCPUPlayers = Config.Bind<bool>("Toggles", "trackCPUPlayers", false);
             useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
+            enableColorSwapIntegration = Config.Bind<bool>("Toggles", "enableColorSwapIntegration", true);
 
             inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
             
@@ -104,6 +112,8 @@ namespace InputViewer
             
             PlayerInputWindows = [InputWindow_FFA_P1, InputWindow_FFA_P2, InputWindow_FFA_P3, InputWindow_FFA_P4];
             AllInputWindows = [InputWindow_Main,  InputWindow_1v1_Left, InputWindow_1v1_Right,  InputWindow_FFA_P1, InputWindow_FFA_P2,  InputWindow_FFA_P3, InputWindow_FFA_P4];
+
+            GameStateEvents.OnStateChange += StateChanged;
         }
 
         private void Start()
@@ -118,6 +128,22 @@ namespace InputViewer
                 "3 : <b>Online Games</b>",
                 "4 : <b>All Games</b>"
             });
+
+            if (ModDependenciesUtils.IsModLoaded(DEPENDENCY_COLORSWAP) && ColorSwapPlugin == null)
+            {
+                ColorSwapPlugin = BepInEx.Bootstrap.Chainloader.PluginInfos[DEPENDENCY_COLORSWAP]?.Instance;
+
+                if (ColorSwapPlugin != null)
+                {
+                    Logger.LogInfo("Found soft dependency ColorSwap");
+                    ColorSwapPlugin.Config.SettingChanged += ColorSwap_SettingChanged;
+                    
+                    ColorSwap_UpdateTeamColors();
+                    RegenerateColorTextures();
+                }
+
+                Config.SettingChanged += SettingChanged;
+            }
         }
 
         private void OnDestroy()
@@ -140,6 +166,88 @@ namespace InputViewer
             Debug.Log(txt);
         }
 #endif
+
+        private ConfigEntry<bool> colorSwap_p1Enabled;
+        private ConfigEntry<int> colorSwap_p1R;
+        private ConfigEntry<int> colorSwap_p1G;
+        private ConfigEntry<int> colorSwap_p1B;
+
+        private ConfigEntry<bool> colorSwap_p2Enabled;
+        private ConfigEntry<int> colorSwap_p2R;
+        private ConfigEntry<int> colorSwap_p2G;
+        private ConfigEntry<int> colorSwap_p2B;
+        
+        private ConfigEntry<bool> colorSwap_p3Enabled;
+        private ConfigEntry<int> colorSwap_p3R;
+        private ConfigEntry<int> colorSwap_p3G;
+        private ConfigEntry<int> colorSwap_p3B;
+        
+        private ConfigEntry<bool> colorSwap_p4Enabled;
+        private ConfigEntry<int> colorSwap_p4R;
+        private ConfigEntry<int> colorSwap_p4G;
+        private ConfigEntry<int> colorSwap_p4B;
+
+        private void ColorSwap_SettingChanged(object sender, SettingChangedEventArgs e)
+        {
+            regenerateColorTextures = true;
+            ColorSwap_UpdateTeamColors();
+        }
+
+        private void ColorSwap_UpdateTeamColors()
+        {
+            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p1Enabled", out colorSwap_p1Enabled);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1R", out colorSwap_p1R);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1G", out colorSwap_p1G);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1B", out colorSwap_p1B);
+            Color p1Color = colorSwap_p1Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p1R.Value/255f, colorSwap_p1G.Value/255f, colorSwap_p1B.Value/255f) : Color.clear;
+            
+            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p2Enabled", out colorSwap_p2Enabled);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2R", out colorSwap_p2R);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2G", out colorSwap_p2G);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2B", out colorSwap_p2B);
+            Color p2Color = colorSwap_p2Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p2R.Value/255f, colorSwap_p2G.Value/255f, colorSwap_p2B.Value/255f) : Color.clear;
+            
+            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p3Enabled", out colorSwap_p3Enabled);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3R", out colorSwap_p3R);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3G", out colorSwap_p3G);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3B", out colorSwap_p3B);
+            Color p3Color = colorSwap_p3Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p3R.Value/255f, colorSwap_p3G.Value/255f, colorSwap_p3B.Value/255f) : Color.clear;
+            
+            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p4Enabled", out colorSwap_p4Enabled);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4R", out colorSwap_p4R);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4G", out colorSwap_p4G);
+            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4B", out colorSwap_p4B);
+            Color p4Color = colorSwap_p4Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p4R.Value/255f, colorSwap_p4G.Value/255f, colorSwap_p4B.Value/255f) : Color.clear;
+            
+            IVStyle.UpdateTeamColors([p1Color, p2Color, p3Color, p4Color]);
+        }
+        
+        private void SettingChanged(object sender, SettingChangedEventArgs e)
+        {
+            regenerateColorTextures = true;
+
+            if (ColorSwapPlugin != null)
+            {
+                ColorSwap_UpdateTeamColors();
+            }
+        }
+
+        void StateChanged(object sender, OnStateChangeArgs e)
+        {
+            if (!regenerateColorTextures)
+            {
+                return;
+            }
+            
+            RegenerateColorTextures();
+            regenerateColorTextures = false;
+        }
+
+        private void RegenerateColorTextures()
+        {
+            Logger.LogInfo("Regenerating color textures");
+            IVStyle.CreateColorBGAssets();
+        }
 
         void Auto_Save()
         {

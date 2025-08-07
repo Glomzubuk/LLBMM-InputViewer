@@ -15,7 +15,8 @@ namespace InputViewer
         public static Dictionary<string, Texture2D> uiTexture2DAssets = new Dictionary<string, Texture2D>();
         public static Texture2D viewerBG;
 
-        public static Color[] TeamColors = [Color.red, Color.blue, Color.yellow, Color.green];
+        public static readonly Color[] DefaultTeamColors = [Color.red, Color.blue, Color.yellow, Color.green];
+        public static Color[] TeamColors = new Color[4];
         private static string[] transparencyNames = ["", "_90", "_80", "_70", "_60", "_50"];
 
         static void LoadAssets()
@@ -28,8 +29,12 @@ namespace InputViewer
             }
             uiTexture2DAssets.Add("BlankTexture", new Texture2D(0, 0));
             inputViewerFont = uiBundle.LoadAsset<Font>("assets/ui/elements.ttf");
-            foreach (var s in IVStyle.uiTexture2DAssets) Debug.Log(s.Key);
+            //foreach (var s in IVStyle.uiTexture2DAssets) Debug.Log(s.Key);
 
+            for (int teamColorIndex = 0; teamColorIndex < DefaultTeamColors.Length; teamColorIndex++)
+            {
+                TeamColors[teamColorIndex] = DefaultTeamColors[teamColorIndex];
+            }
             CreateColorBGAssets();
         }
 
@@ -38,7 +43,18 @@ namespace InputViewer
             LoadAssets();
         }
 
-        private static void CreateColorBGAssets()
+        public static void UpdateTeamColors(Color[] newTeamColors)
+        {
+            for (int teamColorIndex = 0; teamColorIndex < TeamColors.Length; teamColorIndex++)
+            {
+                TeamColors[teamColorIndex] = newTeamColors[teamColorIndex] != Color.clear
+                    ? newTeamColors[teamColorIndex]
+                    : DefaultTeamColors[teamColorIndex];
+            }
+        }
+        
+
+        public static void CreateColorBGAssets()
         {
             for (int teamColorIndex = 0; teamColorIndex < TeamColors.Length; teamColorIndex++)
             {
@@ -140,7 +156,6 @@ namespace InputViewer
             GUIStyleState bg = new GUIStyleState();
 
             string texName = GetTextureName(InputViewer.Instance.backgroundTransparency.Value, team);
-            Debug.Log(texName);
             bg.background = uiTexture2DAssets[texName];
             bg.textColor = Color.white;
 
