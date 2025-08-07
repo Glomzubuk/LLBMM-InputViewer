@@ -15,7 +15,12 @@ namespace InputViewer
         public static Dictionary<string, Texture2D> uiTexture2DAssets = new Dictionary<string, Texture2D>();
         public static Texture2D viewerBG;
 
-        public static readonly Color[] DefaultTeamColors = [Color.red, Color.blue, Color.yellow, Color.green];
+        public static readonly Color[] DefaultTeamColors = [
+            new Color(255/255f, 64/255f, 22/255f),
+            new Color(13/255f, 136/255f, 255/255f),
+            new Color(255/255f, 255/255f, 61/255f),
+            new Color(90/255f, 244/255f, 90/255f)
+        ];
         public static Color[] TeamColors = new Color[4];
         private static string[] transparencyNames = ["", "_90", "_80", "_70", "_60", "_50"];
 
