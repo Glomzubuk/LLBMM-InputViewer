@@ -68,9 +68,11 @@ namespace InputViewer
             {
                 GUITools.ScaleGUIToViewPort();
             }
+
+            GUIStyle colorStyle = IVStyle.GetBGStyle(boundPlayer.Team);
             
             inputRect.size = (isMiniSize.Value || forceMiniSize) ? inputSizeMini : inputSize;
-            inputRect = GUILayout.Window(localWindowID, inputRect, DrawWindow, "", IVStyle.InputViewerBG);
+            inputRect = GUILayout.Window(localWindowID, inputRect, DrawWindow, "", colorStyle);
         }
 
         private void DrawWindow(int windowID)

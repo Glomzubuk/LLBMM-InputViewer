@@ -38,6 +38,8 @@ namespace InputViewer
         public ConfigEntry<int> backgroundTransparency;
         public ConfigEntry<bool> scaleToResolution;
         public ConfigEntry<bool> excludeExpressions;
+        public ConfigEntry<bool> trackCPUPlayers;
+        public ConfigEntry<bool> useTeamColors;
         
         public ConfigEntry<Vector2> inputViewerPosition_main;
         public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
@@ -56,6 +58,9 @@ namespace InputViewer
 
             scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", false);
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
+
+            trackCPUPlayers = Config.Bind<bool>("Toggles", "trackCPUPlayers", false);
+            useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
 
             inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
             
@@ -321,7 +326,7 @@ namespace InputViewer
 
         private bool IsLocalPlayer(Player player)
         {
-            return player.IsLocalPeer && player.IsInMatch && !player.IsAI;
+            return player.IsLocalPeer && player.IsInMatch && (!player.IsAI || trackCPUPlayers.Value);
         }
         
         private int LocalPlayerCount
