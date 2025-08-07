@@ -13,9 +13,6 @@ namespace InputViewer
 
         private static int _windowID = 10000;
         private static int WindowID => _windowID++;
-        
-        private static ConfigEntry<bool> scaleToResolution;
-        private static ConfigEntry<bool> isMiniSize;
 
         private Player boundPlayer;
         private ConfigEntry<Vector2> savedPosition;
@@ -31,12 +28,6 @@ namespace InputViewer
             FORCE_MINI
         }
         private SizeMode sizeMode;
-
-        public static void BindConfigs(ConfigEntry<bool> scaleToResolution, ConfigEntry<bool> isMiniSize)
-        {
-            InputWindow.scaleToResolution = scaleToResolution;
-            InputWindow.isMiniSize = isMiniSize;
-        }
 
         public void Initialize(ConfigEntry<Vector2> savedPosition, bool isDraggable = true, SizeMode sizeMode = SizeMode.DEFAULT)
         {
@@ -72,7 +63,7 @@ namespace InputViewer
                 {
                     SizeMode.FORCE_BIG => false,
                     SizeMode.FORCE_MINI => true,
-                    _ => isMiniSize.Value
+                    _ => InputViewer.Instance.excludeExpressions.Value
                 };
             }
         }
@@ -84,7 +75,7 @@ namespace InputViewer
                 return;
             }
             
-            if (scaleToResolution.Value)
+            if (InputViewer.Instance.scaleToResolution.Value)
             {
                 GUITools.ScaleGUIToViewPort();
             }

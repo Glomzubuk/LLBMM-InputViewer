@@ -97,8 +97,6 @@ namespace InputViewer
             Instance = this;
             IVStyle.ATInit();
             ConfigInit();
-
-            InputWindow.BindConfigs(scaleToResolution, excludeExpressions);
             
             InputWindow_Main = gameObject.AddComponent<InputWindow>();
             InputWindow_Main.Initialize(inputViewerPosition_main);
