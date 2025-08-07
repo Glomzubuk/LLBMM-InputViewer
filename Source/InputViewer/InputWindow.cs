@@ -20,10 +20,17 @@ namespace InputViewer
         private Player boundPlayer;
         private ConfigEntry<Vector2> savedPosition;
         private int localWindowID;
-        private bool forceMiniSize;
         private bool isDraggable;
 
         public Rect inputRect = new Rect(0, 0, inputSize.x, inputSize.y);
+
+        public enum SizeMode
+        {
+            DEFAULT,
+            FORCE_BIG,
+            FORCE_MINI
+        }
+        private SizeMode sizeMode;
 
         public static void BindConfigs(ConfigEntry<bool> scaleToResolution, ConfigEntry<bool> isMiniSize)
         {
@@ -31,11 +38,11 @@ namespace InputViewer
             InputWindow.isMiniSize = isMiniSize;
         }
 
-        public void Initialize(ConfigEntry<Vector2> savedPosition, bool isDraggable = true, bool forceMiniSize = false)
+        public void Initialize(ConfigEntry<Vector2> savedPosition, bool isDraggable = true, SizeMode sizeMode = SizeMode.DEFAULT)
         {
             this.savedPosition = savedPosition;
             this.isDraggable = isDraggable;
-            this.forceMiniSize = forceMiniSize;
+            this.sizeMode = sizeMode;
             localWindowID = WindowID;
             
             inputRect.position = savedPosition.Value;
@@ -57,6 +64,19 @@ namespace InputViewer
             savedPosition.Value = inputRect.position;
         }
 
+        private bool IsMiniSize
+        {
+            get
+            {
+                return sizeMode switch
+                {
+                    SizeMode.FORCE_BIG => false,
+                    SizeMode.FORCE_MINI => true,
+                    _ => isMiniSize.Value
+                };
+            }
+        }
+
         public void OnGUI()
         {
             if (boundPlayer == null)
@@ -70,8 +90,8 @@ namespace InputViewer
             }
 
             GUIStyle colorStyle = IVStyle.GetBGStyle(boundPlayer.Team);
-            
-            inputRect.size = (isMiniSize.Value || forceMiniSize) ? inputSizeMini : inputSize;
+
+            inputRect.size = IsMiniSize ? inputSizeMini : inputSize;
             inputRect = GUILayout.Window(localWindowID, inputRect, DrawWindow, "", colorStyle);
         }
 
@@ -110,7 +130,7 @@ namespace InputViewer
             
             GUILayout.BeginVertical();
             
-            GUILayout.Label((isMiniSize.Value || forceMiniSize) ? "Inputs" : "Input Viewer", headerStyle);
+            GUILayout.Label(IsMiniSize ? "Inputs" : "Input Viewer", headerStyle);
             GUILayout.BeginHorizontal();
             
             GUILayout.BeginVertical();
@@ -139,7 +159,7 @@ namespace InputViewer
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
 
-            if (!(isMiniSize.Value || forceMiniSize)) // should include taunt expressions
+            if (!IsMiniSize) // should include taunt expressions
             {
                 GUILayout.BeginVertical();
                 GUILayout.FlexibleSpace();

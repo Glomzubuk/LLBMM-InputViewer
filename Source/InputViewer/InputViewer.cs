@@ -44,9 +44,11 @@ namespace InputViewer
         public ConfigEntry<int> backgroundTransparency;
         public ConfigEntry<bool> scaleToResolution;
         public ConfigEntry<bool> excludeExpressions;
-        public ConfigEntry<bool> trackCPUPlayers;
         public ConfigEntry<bool> useTeamColors;
         public ConfigEntry<bool> enableColorSwapIntegration;
+
+        public ConfigEntry<bool> enableLocalViewer;
+        public ConfigEntry<bool> trackLocalCPUs;
         
         public ConfigEntry<Vector2> inputViewerPosition_main;
         public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
@@ -63,12 +65,17 @@ namespace InputViewer
             backgroundTransparency = Config.Bind<int>("General", "backgroundTransparency", 0,
                 new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
 
-            scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", false);
+            scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", true);
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
-
-            trackCPUPlayers = Config.Bind<bool>("Toggles", "trackCPUPlayers", false);
+            
             useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
             enableColorSwapIntegration = Config.Bind<bool>("Toggles", "enableColorSwapIntegration", true);
+
+            Config.Bind("gap", "mm_header_gap", 20, new ConfigDescription("", null, "modmenu_gap"));
+            Config.Bind("localViewer", "mm_header_localViewer", "Local Viewer",
+                new ConfigDescription("", null, "modmenu_header"));
+            enableLocalViewer = Config.Bind<bool>("Toggles", "enableLocalViewer", false);
+            trackLocalCPUs = Config.Bind<bool>("Toggles", "trackLocalCPUs", true);
 
             inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
             
@@ -97,18 +104,18 @@ namespace InputViewer
             InputWindow_Main.Initialize(inputViewerPosition_main);
             
             InputWindow_1v1_Left = gameObject.AddComponent<InputWindow>();
-            InputWindow_1v1_Left.Initialize(inputViewerPosition_1v1_left, false);
+            InputWindow_1v1_Left.Initialize(inputViewerPosition_1v1_left, false, InputWindow.SizeMode.FORCE_BIG);
             InputWindow_1v1_Right = gameObject.AddComponent<InputWindow>();
-            InputWindow_1v1_Right.Initialize(inputViewerPosition_1v1_right, false);
+            InputWindow_1v1_Right.Initialize(inputViewerPosition_1v1_right, false, InputWindow.SizeMode.FORCE_BIG);
             
             InputWindow_FFA_P1 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P1.Initialize(inputViewerPosition_FFA_P1, false, true);
+            InputWindow_FFA_P1.Initialize(inputViewerPosition_FFA_P1, false, InputWindow.SizeMode.FORCE_MINI);
             InputWindow_FFA_P2 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P2.Initialize(inputViewerPosition_FFA_P2, false, true);
+            InputWindow_FFA_P2.Initialize(inputViewerPosition_FFA_P2, false, InputWindow.SizeMode.FORCE_MINI);
             InputWindow_FFA_P3 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P3.Initialize(inputViewerPosition_FFA_P3, false, true);
+            InputWindow_FFA_P3.Initialize(inputViewerPosition_FFA_P3, false, InputWindow.SizeMode.FORCE_MINI);
             InputWindow_FFA_P4 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P4.Initialize(inputViewerPosition_FFA_P4, false, true);
+            InputWindow_FFA_P4.Initialize(inputViewerPosition_FFA_P4, false, InputWindow.SizeMode.FORCE_MINI);
             
             PlayerInputWindows = [InputWindow_FFA_P1, InputWindow_FFA_P2, InputWindow_FFA_P3, InputWindow_FFA_P4];
             AllInputWindows = [InputWindow_Main,  InputWindow_1v1_Left, InputWindow_1v1_Right,  InputWindow_FFA_P1, InputWindow_FFA_P2,  InputWindow_FFA_P3, InputWindow_FFA_P4];
@@ -121,12 +128,15 @@ namespace InputViewer
             Logger.LogInfo("InputViewer Started");
             ModDependenciesUtils.RegisterToModMenu(this.Info, new List<String> {
                 "<b>Select View Mode Index</b>:",
-                "",
                 "0 : <b>Off</b>",
                 "1 : <b>Training Mode</b>",
                 "2 : <b>Local Games</b>",
                 "3 : <b>Online Games</b>",
-                "4 : <b>All Games</b>"
+                "4 : <b>All Games</b>",
+                "",
+                "<b>Enable local viewer</b>: shows an individual input viewer window for each player in LAN games",
+                "Local viewer windows are not draggable to prevent accidental moving, and each have their own saved position in the config",
+                "Highly recommended to also enable '<b>Scale With Resolution</b>' when enabling local viewer"
             });
 
             if (ModDependenciesUtils.IsModLoaded(DEPENDENCY_COLORSWAP) && ColorSwapPlugin == null)
@@ -369,13 +379,20 @@ namespace InputViewer
             int localPlayerCount = LocalPlayerCount;
 
             // training, local with CPUs, online
-            if ((localPlayerCount == 1 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
+            if (( (localPlayerCount == 1 || !enableLocalViewer.Value) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
                 InputWindow_Main.BindPlayer(GetFirstLocalPlayer());
             
                 InputWindow_Main.enabled = true;
+                return;
             }
-            else if (localPlayerCount == 2 && InGame)
+
+            if (!enableLocalViewer.Value)
+            {
+                return;
+            }
+            
+            if (localPlayerCount == 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
                 Player leftPLayer = GetFirstLocalPlayer();
                 Player rightPlayer = GetSecondLocalPlayer(leftPLayer);
@@ -386,7 +403,7 @@ namespace InputViewer
                 InputWindow_1v1_Left.enabled = true;
                 InputWindow_1v1_Right.enabled = true;
             }
-            else if (localPlayerCount > 2 && InGame)
+            else if (localPlayerCount > 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
                 for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
                 {
@@ -434,7 +451,7 @@ namespace InputViewer
 
         private bool IsLocalPlayer(Player player)
         {
-            return player.IsLocalPeer && player.IsInMatch && (!player.IsAI || trackCPUPlayers.Value);
+            return player.IsLocalPeer && player.IsInMatch && (!player.IsAI || trackLocalCPUs.Value);
         }
         
         private int LocalPlayerCount
