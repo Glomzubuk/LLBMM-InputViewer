@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using LLModdingTools;
 using LLScreen;
 using UnityEngine;
 using BepInEx;
 using BepInEx.Configuration;
+using BepInEx.Logging;
 using LLBML;
 using LLBML.GameEvents;
 using LLBML.Players;
 using LLBML.States;
 using LLBML.Networking;
 using LLBML.Utils;
+using LLGUI;
 
 namespace InputViewer
 {
@@ -26,16 +27,20 @@ namespace InputViewer
         public BaseUnityPlugin ColorSwapPlugin = null;
         
         public static InputViewer Instance { get; private set; } = null;
-        
-        private InputWindow InputWindow_Main;
-        private InputWindow InputWindow_1v1_Left;
-        private InputWindow InputWindow_1v1_Right;
-        private InputWindow InputWindow_FFA_P1;
-        private InputWindow InputWindow_FFA_P2;
-        private InputWindow InputWindow_FFA_P3;
-        private InputWindow InputWindow_FFA_P4;
+        public static ManualLogSource LogGlobal { get; private set; }
+
+        private RectTransform inputWindowContainer;
+        private InputWindow inputWindowMain;
+        private InputWindow inputWindow1v1Left;
+        private InputWindow inputWindow1v1Right;
+        private InputWindow inputWindowFfaP1;
+        private InputWindow inputWindowFfaP2;
+        private InputWindow inputWindowFfaP3;
+        private InputWindow inputWindowFfaP4;
         private InputWindow[] PlayerInputWindows;
         private InputWindow[] AllInputWindows;
+
+        private bool inputWindowsCreated = false;
 
         private float saveTimer;
         private bool regenerateColorTextures;
@@ -77,48 +82,53 @@ namespace InputViewer
             enableLocalViewer = Config.Bind<bool>("Toggles", "enableLocalViewer", false);
             trackLocalCPUs = Config.Bind<bool>("Toggles", "trackLocalCPUs", true);
 
-            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(30, GUITools.GUI_Height - 147));
+            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(-520f, -300f));
             
-            inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(30, GUITools.GUI_Height - 147));
-            inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(GUITools.GUI_Width - InputWindow.inputSize.x - 30, GUITools.GUI_Height - 147));
+            inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(-520f, -300f));
+            inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(520f, -300f));
 
             inputViewerPosition_FFA_P1 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P1",
-                new Vector2(20, GUITools.GUI_Height - 147));
+                new Vector2(-570f, -300f));
             inputViewerPosition_FFA_P2 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P2",
-                new Vector2(20*2 + InputWindow.inputSizeMini.x, GUITools.GUI_Height - 147));
+                new Vector2(-450f, -300f));
             inputViewerPosition_FFA_P3 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P3",
-                new Vector2(GUITools.GUI_Width - InputWindow.inputSizeMini.x*2 - 20*2, GUITools.GUI_Height - 147));
+                new Vector2(450f, -300f));
             inputViewerPosition_FFA_P4 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P4",
-                new Vector2(GUITools.GUI_Width - InputWindow.inputSizeMini.x - 20, GUITools.GUI_Height - 147));
+                new Vector2(570f, -300f));
         }
 
         void Awake()
         {
             Instance = this;
+            LogGlobal = Logger;
             IVStyle.ATInit();
             ConfigInit();
-            
-            InputWindow_Main = gameObject.AddComponent<InputWindow>();
-            InputWindow_Main.Initialize(inputViewerPosition_main);
-            
-            InputWindow_1v1_Left = gameObject.AddComponent<InputWindow>();
-            InputWindow_1v1_Left.Initialize(inputViewerPosition_1v1_left, false, InputWindow.SizeMode.FORCE_BIG);
-            InputWindow_1v1_Right = gameObject.AddComponent<InputWindow>();
-            InputWindow_1v1_Right.Initialize(inputViewerPosition_1v1_right, false, InputWindow.SizeMode.FORCE_BIG);
-            
-            InputWindow_FFA_P1 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P1.Initialize(inputViewerPosition_FFA_P1, false, InputWindow.SizeMode.FORCE_MINI);
-            InputWindow_FFA_P2 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P2.Initialize(inputViewerPosition_FFA_P2, false, InputWindow.SizeMode.FORCE_MINI);
-            InputWindow_FFA_P3 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P3.Initialize(inputViewerPosition_FFA_P3, false, InputWindow.SizeMode.FORCE_MINI);
-            InputWindow_FFA_P4 = gameObject.AddComponent<InputWindow>();
-            InputWindow_FFA_P4.Initialize(inputViewerPosition_FFA_P4, false, InputWindow.SizeMode.FORCE_MINI);
-            
-            PlayerInputWindows = [InputWindow_FFA_P1, InputWindow_FFA_P2, InputWindow_FFA_P3, InputWindow_FFA_P4];
-            AllInputWindows = [InputWindow_Main,  InputWindow_1v1_Left, InputWindow_1v1_Right,  InputWindow_FFA_P1, InputWindow_FFA_P2,  InputWindow_FFA_P3, InputWindow_FFA_P4];
+            Config.SettingChanged += SettingChanged;
 
             GameStateEvents.OnStateChange += StateChanged;
+        }
+
+        private void CreateInputWindows()
+        {
+            inputWindowContainer = LLControl.CreatePanel(UIScreen.tfUIRoot, "Input Windows", 0, 0);
+            inputWindowContainer.anchorMin = new Vector2(0f, 0f);
+            inputWindowContainer.anchorMax = new Vector2(1f, 1f);
+            inputWindowContainer.localPosition = Vector2.zero;
+            
+            inputWindow1v1Left = InputWindow.Create(inputWindowContainer, "inputWindow1v1Left", inputViewerPosition_1v1_left, false, false);
+            inputWindow1v1Right = InputWindow.Create(inputWindowContainer, "inputWindow1v1Right", inputViewerPosition_1v1_right, false, false);
+            
+            inputWindowFfaP1 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP1", inputViewerPosition_FFA_P1, true, false);
+            inputWindowFfaP2 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP2", inputViewerPosition_FFA_P2, true, false);
+            inputWindowFfaP3 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP3", inputViewerPosition_FFA_P3, true, false);
+            inputWindowFfaP4 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP4", inputViewerPosition_FFA_P4, true, false);
+            
+            inputWindowMain = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
+
+            PlayerInputWindows = [inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4];
+            AllInputWindows = [inputWindowMain, inputWindow1v1Left, inputWindow1v1Right, inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4];
+
+            inputWindowsCreated = true;
         }
 
         private void Start()
@@ -149,8 +159,6 @@ namespace InputViewer
                     ColorSwap_UpdateTeamColors();
                     RegenerateColorTextures();
                 }
-
-                Config.SettingChanged += SettingChanged;
             }
         }
 
@@ -238,6 +246,17 @@ namespace InputViewer
             {
                 ColorSwap_UpdateTeamColors();
             }
+
+            if (inputWindowMain.isMiniSize != excludeExpressions.Value)
+            {
+                InputWindow windowOld = inputWindowMain;
+                InputWindow windowNew = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
+                windowNew.BindPlayer(windowOld.boundPlayer);
+                
+                Destroy(windowOld.gameObject);
+                inputWindowMain = windowNew;
+                AllInputWindows[0] = inputWindowMain;
+            }
         }
 
         void StateChanged(object sender, OnStateChangeArgs e)
@@ -256,32 +275,15 @@ namespace InputViewer
             Logger.LogInfo("Regenerating color textures");
             IVStyle.CreateColorBGAssets();
         }
-
+        
         void Auto_Save()
         {
-            bool needsSave = false;
-            
-            foreach (InputWindow window in AllInputWindows)
-            {
-                if (window.IsPositionUnsaved())
-                {
-                    needsSave = true;
-                }
-            }
-
-            if (!needsSave)
-            {
-                return;
-            }
+            if (!inputWindowMain.IsPositionUnsaved()) return;
 
             saveTimer += Time.deltaTime;
             if (CountDown(ref saveTimer, 5f))
             {
-                foreach (InputWindow window in AllInputWindows)
-                {
-                    window.SavePosition();
-                }
-
+                inputWindowMain.SavePosition();
                 Config.Save();
             }
         }
@@ -299,8 +301,14 @@ namespace InputViewer
             return timer == 0;
         }
 
-        void Update()
+        void LateUpdate()
         {
+            if (AllInputWindows == null) return;
+            foreach (InputWindow window in AllInputWindows)
+            {
+                window.UpdateColor();
+            }
+            
             if (ModDependenciesUtils.InModOptions())
             {
                 Auto_Save();
@@ -367,11 +375,19 @@ namespace InputViewer
             */
         }
 
-        private void LateUpdate()
+        private void Update()
         {
+            if (!inputWindowsCreated)
+            {
+                if (UIScreen.tfUIRoot != null) CreateInputWindows();
+            }
+            
+            if (!inputWindowsCreated) return;
+
+            inputWindowContainer.SetAsLastSibling();
             foreach (InputWindow window in AllInputWindows)
             {
-                window.enabled = false;
+                window.gameObject.SetActive(false);
             }
             
             int localPlayerCount = LocalPlayerCount;
@@ -379,9 +395,11 @@ namespace InputViewer
             // training, local with CPUs, online
             if (( (localPlayerCount == 1 || !enableLocalViewer.Value) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
-                InputWindow_Main.BindPlayer(GetFirstLocalPlayer());
+                //_legacyInputWindowMain.BindPlayer(GetFirstLocalPlayer());
+                inputWindowMain.BindPlayer(GetFirstLocalPlayer());
             
-                InputWindow_Main.enabled = true;
+                //_legacyInputWindowMain.enabled = true;
+                inputWindowMain.gameObject.SetActive(true);
                 return;
             }
 
@@ -395,11 +413,15 @@ namespace InputViewer
                 Player leftPLayer = GetFirstLocalPlayer();
                 Player rightPlayer = GetSecondLocalPlayer(leftPLayer);
                 
-                InputWindow_1v1_Left.BindPlayer(leftPLayer);
-                InputWindow_1v1_Right.BindPlayer(rightPlayer);
+                //_legacyInputWindow1V1Left.BindPlayer(leftPLayer);
+                //_legacyInputWindow1V1Right.BindPlayer(rightPlayer);
+                inputWindow1v1Left.BindPlayer(leftPLayer);
+                inputWindow1v1Right.BindPlayer(rightPlayer);
 
-                InputWindow_1v1_Left.enabled = true;
-                InputWindow_1v1_Right.enabled = true;
+                //_legacyInputWindow1V1Left.enabled = true;
+                //_legacyInputWindow1V1Right.enabled = true;
+                inputWindow1v1Left.gameObject.SetActive(true);
+                inputWindow1v1Right.gameObject.SetActive(true);
             }
             else if (localPlayerCount > 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
@@ -412,9 +434,12 @@ namespace InputViewer
                         continue;
                     }
 
+                    //LegacyInputWindow window = PlayerLegacyInputWindows[playerIndex];
+                    //window.BindPlayer(player);
+                    //window.enabled = true;
                     InputWindow window = PlayerInputWindows[playerIndex];
                     window.BindPlayer(player);
-                    window.enabled = true;
+                    window.gameObject.SetActive(true);
                 }
             }
         }

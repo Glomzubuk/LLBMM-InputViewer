@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using LLBML.Players;
+using LLHandlers;
 using UnityEngine;
 
 namespace InputViewer
@@ -13,6 +14,8 @@ namespace InputViewer
         public static AssetBundle uiBundle;
         public static Font inputViewerFont;
         public static Dictionary<string, Texture2D> uiTexture2DAssets = new Dictionary<string, Texture2D>();
+        public static Dictionary<string, GameObject> uiPrefabAssets = new Dictionary<string, GameObject>();
+        public static Dictionary<string, Sprite> uiSprites = new Dictionary<string, Sprite>();
         public static Texture2D viewerBG;
 
         public static readonly Color[] DefaultTeamColors = [
@@ -41,6 +44,20 @@ namespace InputViewer
                 TeamColors[teamColorIndex] = DefaultTeamColors[teamColorIndex];
             }
             CreateColorBGAssets();
+
+            GameObject[] gameObjects = uiBundle.LoadAllAssets<GameObject>();
+            for (int i = 0; i < gameObjects.Length; i++)
+            {
+                uiPrefabAssets.Add(gameObjects[i].name, gameObjects[i]);
+            }
+
+            foreach (KeyValuePair<string, Texture2D> entry in uiTexture2DAssets)
+            {
+                string name = entry.Key;
+                Texture2D tex = entry.Value;
+                Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                uiSprites.Add(name, sprite);
+            }
         }
 
         public static void ATInit()
