@@ -43,11 +43,9 @@ namespace InputViewer
         private bool inputWindowsCreated = false;
 
         private float saveTimer;
-        private bool regenerateColorTextures;
         
         public ConfigEntry<int> selectViewingMode;
         public ConfigEntry<int> backgroundTransparency;
-        public ConfigEntry<bool> scaleToResolution;
         public ConfigEntry<bool> excludeExpressions;
         public ConfigEntry<bool> useTeamColors;
         public ConfigEntry<bool> enableColorSwapIntegration;
@@ -70,7 +68,6 @@ namespace InputViewer
             backgroundTransparency = Config.Bind<int>("General", "backgroundTransparency", 0,
                 new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
 
-            scaleToResolution = Config.Bind<bool>("Toggles", "scaleWithResolution", true);
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
             
             useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
@@ -104,8 +101,6 @@ namespace InputViewer
             IVStyle.ATInit();
             ConfigInit();
             Config.SettingChanged += SettingChanged;
-
-            GameStateEvents.OnStateChange += StateChanged;
         }
 
         private void CreateInputWindows()
@@ -157,7 +152,6 @@ namespace InputViewer
                     ColorSwapPlugin.Config.SettingChanged += ColorSwap_SettingChanged;
                     
                     ColorSwap_UpdateTeamColors();
-                    RegenerateColorTextures();
                 }
             }
         }
@@ -205,7 +199,6 @@ namespace InputViewer
 
         private void ColorSwap_SettingChanged(object sender, SettingChangedEventArgs e)
         {
-            regenerateColorTextures = true;
             ColorSwap_UpdateTeamColors();
         }
 
@@ -240,8 +233,6 @@ namespace InputViewer
         
         private void SettingChanged(object sender, SettingChangedEventArgs e)
         {
-            regenerateColorTextures = true;
-
             if (ColorSwapPlugin != null)
             {
                 ColorSwap_UpdateTeamColors();
@@ -257,23 +248,6 @@ namespace InputViewer
                 inputWindowMain = windowNew;
                 AllInputWindows[0] = inputWindowMain;
             }
-        }
-
-        void StateChanged(object sender, OnStateChangeArgs e)
-        {
-            if (!regenerateColorTextures)
-            {
-                return;
-            }
-            
-            RegenerateColorTextures();
-            regenerateColorTextures = false;
-        }
-
-        private void RegenerateColorTextures()
-        {
-            Logger.LogInfo("Regenerating color textures");
-            IVStyle.CreateColorBGAssets();
         }
         
         void Auto_Save()
@@ -395,10 +369,8 @@ namespace InputViewer
             // training, local with CPUs, online
             if (( (localPlayerCount == 1 || !enableLocalViewer.Value) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
-                //_legacyInputWindowMain.BindPlayer(GetFirstLocalPlayer());
                 inputWindowMain.BindPlayer(GetFirstLocalPlayer());
             
-                //_legacyInputWindowMain.enabled = true;
                 inputWindowMain.gameObject.SetActive(true);
                 return;
             }
@@ -413,13 +385,9 @@ namespace InputViewer
                 Player leftPLayer = GetFirstLocalPlayer();
                 Player rightPlayer = GetSecondLocalPlayer(leftPLayer);
                 
-                //_legacyInputWindow1V1Left.BindPlayer(leftPLayer);
-                //_legacyInputWindow1V1Right.BindPlayer(rightPlayer);
                 inputWindow1v1Left.BindPlayer(leftPLayer);
                 inputWindow1v1Right.BindPlayer(rightPlayer);
 
-                //_legacyInputWindow1V1Left.enabled = true;
-                //_legacyInputWindow1V1Right.enabled = true;
                 inputWindow1v1Left.gameObject.SetActive(true);
                 inputWindow1v1Right.gameObject.SetActive(true);
             }
@@ -434,9 +402,6 @@ namespace InputViewer
                         continue;
                     }
 
-                    //LegacyInputWindow window = PlayerLegacyInputWindows[playerIndex];
-                    //window.BindPlayer(player);
-                    //window.enabled = true;
                     InputWindow window = PlayerInputWindows[playerIndex];
                     window.BindPlayer(player);
                     window.gameObject.SetActive(true);
