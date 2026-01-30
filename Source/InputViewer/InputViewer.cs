@@ -247,32 +247,8 @@ namespace InputViewer
                 AllInputWindows[0] = inputWindowMain;
             }
         }
-        
-        void Auto_Save()
-        {
-            if (!inputWindowMain.IsPositionUnsaved()) return;
 
-            saveTimer += Time.deltaTime;
-            if (CountDown(ref saveTimer, 5f))
-            {
-                inputWindowMain.SavePosition();
-                Config.Save();
-            }
-        }
-
-        static bool CountDown(ref float timer, float duration)
-        {
-            if (timer > 0 && timer < duration) // Cooldown in seconds
-            {
-                timer += Time.deltaTime;
-            }
-            else
-            {
-                timer = 0;
-            }
-            return timer == 0;
-        }
-
+        private bool queueSave;
         void LateUpdate()
         {
             if (AllInputWindows == null) return;
@@ -280,71 +256,18 @@ namespace InputViewer
             {
                 window.UpdateColor();
             }
-            
+
             if (ModDependenciesUtils.InModOptions())
             {
-                Auto_Save();
+                if (inputWindowMain.IsPositionUnsaved()) queueSave = true;
             }
-            /*
-#if DEBUG
-            if (Input.GetKeyDown(KeyCode.Keypad7))
+            else if (queueSave)
             {
-                Save_InputViewerPosition();
+                inputWindowMain.SavePosition();
+                Config.Save();
+                LogGlobal.LogInfo("Saved InputViewer position");
+                queueSave = false;
             }
-
-            if (Input.GetKeyDown(KeyCode.Keypad8))
-            {
-                Load_InputViewerPosition();
-            }
-#endif
-            */
-
-            //Experimental Code - not much to see here.
-            /*
-#if DEBUG
-            if (Input.GetKeyDown(KeyCode.Alpha9))
-            {
-                Cursor.visible = !Cursor.visible;
-                GameObject header = new GameObject("header", typeof(Image), typeof(LayoutElement));
-                GameObject body = new GameObject("body", typeof(Image), typeof(LayoutElement));
-                GameObject frame = new GameObject("frame", typeof(VerticalLayoutGroup));
-                GameObject panel = new GameObject("panel", typeof(Image));
-                GameObject canvas = new GameObject("canvas", typeof(Canvas), typeof(CanvasScaler));
-
-                panel.transform.SetParent(canvas.transform);
-                frame.transform.SetParent(panel.transform);
-                header.transform.SetParent(frame.transform);
-                body.transform.SetParent(frame.transform);
-
-                header.GetComponent<LayoutElement>().minHeight = 50;
-                body.GetComponent<LayoutElement>().minHeight = 100;
-                body.GetComponent<LayoutElement>().preferredHeight = 999;
-
-                canvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-                canvas.GetComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                canvas.GetComponent<CanvasScaler>().matchWidthOrHeight = 0.5f;
-                canvas.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1280, 720);
-
-                panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.5f);
-                panel.GetComponent<RectTransform>().anchorMin = new Vector2(0, 0);
-                panel.GetComponent<RectTransform>().anchorMax = new Vector2(1, 1);
-                panel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
-
-                RectTransform frameRect = frame.GetComponent<RectTransform>();
-                VerticalLayoutGroup frameVertGroup = frame.GetComponent<VerticalLayoutGroup>();
-                frameRect.anchorMin = new Vector2(0, 0);
-                frameRect.anchorMax = new Vector2(0, 0);
-                frameRect.pivot = new Vector2(0.5f, 0.5f);
-                frameRect.sizeDelta = new Vector2(550, 300);
-                frameRect.position = new Vector2(300, 203);
-                frameVertGroup.spacing = 10;
-                frameVertGroup.childControlHeight = true;
-                frameVertGroup.childControlWidth = true;
-                frameVertGroup.childForceExpandHeight = true;
-                frameVertGroup.childForceExpandWidth = true;
-            }
-#endif
-            */
         }
 
         private void Update()
