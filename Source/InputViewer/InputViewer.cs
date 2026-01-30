@@ -69,7 +69,7 @@ namespace InputViewer
 
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
             
-            useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", true);
+            useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
             enableColorSwapIntegration = Config.Bind<bool>("Toggles", "enableColorSwapIntegration", true);
 
             Config.Bind("gap", "mm_header_gap", 20, new ConfigDescription("", null, "modmenu_gap"));
@@ -294,7 +294,7 @@ namespace InputViewer
             int localPlayerCount = LocalPlayerCount;
 
             // training, local with CPUs, online
-            if (( (localPlayerCount == 1 || (!enableLocalViewer.Value && !ForceLocalViewers())) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
+            if (( (localPlayerCount == 1 || StateApi.CurrentGameMode == GameMode.TRAINING || (!enableLocalViewer.Value && !ForceLocalViewers())) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
                 inputWindowMain.BindPlayer(GetFirstLocalPlayer(false));
             
