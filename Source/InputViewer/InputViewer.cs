@@ -102,6 +102,12 @@ namespace InputViewer
             Config.SettingChanged += SettingChanged;
         }
 
+        // API endpoint for other mods (e.g. spectate/replay mod)
+        public bool ForceLocalViewers()
+        {
+            return false;
+        }
+
         private void CreateInputWindows()
         {
             inputWindowContainer = LLControl.CreatePanel(UIScreen.tfUIRoot, "Input Windows", 0, 0);
@@ -288,29 +294,29 @@ namespace InputViewer
             int localPlayerCount = LocalPlayerCount;
 
             // training, local with CPUs, online
-            if (( (localPlayerCount == 1 || !enableLocalViewer.Value) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
+            if (( (localPlayerCount == 1 || (!enableLocalViewer.Value && !ForceLocalViewers())) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
-                inputWindowMain.BindPlayer(GetFirstLocalPlayer());
+                inputWindowMain.BindPlayer(GetFirstLocalPlayer(false));
             
                 inputWindowMain.gameObject.SetActive(true);
                 return;
             }
 
-            if (!enableLocalViewer.Value)
+            if (!enableLocalViewer.Value && !ForceLocalViewers())
             {
                 return;
             }
             
             if (localPlayerCount == 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
-                Player leftPLayer = GetFirstLocalPlayer();
-                Player rightPlayer = GetSecondLocalPlayer(leftPLayer);
+                Player leftPLayer = GetFirstLocalPlayer(true);
+                Player rightPlayer = GetSecondLocalPlayer(leftPLayer, true);
                 
                 inputWindow1v1Left.BindPlayer(leftPLayer);
                 inputWindow1v1Right.BindPlayer(rightPlayer);
 
-                inputWindow1v1Left.gameObject.SetActive(true);
-                inputWindow1v1Right.gameObject.SetActive(true);
+                inputWindow1v1Left.gameObject.SetActive(!(leftPLayer.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
+                inputWindow1v1Right.gameObject.SetActive(!(rightPlayer.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
             }
             else if (localPlayerCount > 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
@@ -318,14 +324,14 @@ namespace InputViewer
                 {
                     Player player = Player.GetPlayer(playerIndex);
 
-                    if (!IsLocalPlayer(player))
+                    if (!IsLocalPlayer(player, true))
                     {
                         continue;
                     }
 
                     InputWindow window = PlayerInputWindows[playerIndex];
                     window.BindPlayer(player);
-                    window.gameObject.SetActive(true);
+                    window.gameObject.SetActive(!(player.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
                 }
             }
         }
@@ -334,7 +340,7 @@ namespace InputViewer
         {
             Off,
             Training,
-            local,
+            Local,
             Online,
             All,
         }
@@ -347,7 +353,7 @@ namespace InputViewer
                     return false;
                 case ViewMode.Training:
                     return StateApi.CurrentGameMode == GameMode.TRAINING;
-                case ViewMode.local:
+                case ViewMode.Local:
                     return !NetworkApi.IsOnline;
                 case ViewMode.Online:
                     return NetworkApi.IsOnline;
@@ -358,9 +364,11 @@ namespace InputViewer
             }
         }
 
-        private bool IsLocalPlayer(Player player)
+        private bool IsLocalPlayer(Player player, bool allowCPUs)
         {
-            return player.IsLocalPeer && player.IsInMatch && (!player.IsAI || trackLocalCPUs.Value);
+            bool isLocal = player.IsLocalPeer && player.IsInMatch;
+            bool blockAI = player.IsAI && !allowCPUs;
+            return isLocal && (!blockAI || ForceLocalViewers());
         }
         
         private int LocalPlayerCount
@@ -373,7 +381,7 @@ namespace InputViewer
                 {
                     Player player = Player.GetPlayer(playerIndex);
 
-                    if (IsLocalPlayer(player))
+                    if (IsLocalPlayer(player, true))
                     {
                         count++;
                     }
@@ -383,13 +391,13 @@ namespace InputViewer
             }
         }
 
-        private Player GetFirstLocalPlayer()
+        private Player GetFirstLocalPlayer(bool allowCPUs)
         {
             Player localPlayer = Player.GetPlayer(0);
             for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
             {
                 Player tempPlayer = Player.GetPlayer(playerIndex);
-                if (IsLocalPlayer(tempPlayer))
+                if (IsLocalPlayer(tempPlayer, allowCPUs))
                 {
                     localPlayer = tempPlayer;
                     break;
@@ -399,13 +407,13 @@ namespace InputViewer
             return localPlayer;
         }
         
-        private Player GetSecondLocalPlayer(Player firstPlayer)
+        private Player GetSecondLocalPlayer(Player firstPlayer, bool allowCPUs)
         {
             Player localPlayer = Player.GetPlayer(0);
             for (int playerIndex = firstPlayer.nr + 1; playerIndex < Player.MAX_PLAYERS; playerIndex++)
             {
                 Player tempPlayer = Player.GetPlayer(playerIndex);
-                if (IsLocalPlayer(tempPlayer))
+                if (IsLocalPlayer(tempPlayer, allowCPUs))
                 {
                     localPlayer = tempPlayer;
                     break;
