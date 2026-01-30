@@ -6,7 +6,6 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using LLBML;
-using LLBML.GameEvents;
 using LLBML.Players;
 using LLBML.States;
 using LLBML.Networking;
@@ -138,8 +137,7 @@ namespace InputViewer
                 "4 : <b>All Games</b>",
                 "",
                 "<b>Enable local viewer</b>: shows an individual input viewer window for each player in LAN games",
-                "Local viewer windows are not draggable to prevent accidental moving, and each have their own saved position in the config",
-                "Highly recommended to also enable '<b>Scale With Resolution</b>' when enabling local viewer"
+                "Local viewer windows are not draggable to prevent accidental moving, and each have their own saved position in the config"
             });
 
             if (ModDependenciesUtils.IsModLoaded(DEPENDENCY_COLORSWAP) && ColorSwapPlugin == null)

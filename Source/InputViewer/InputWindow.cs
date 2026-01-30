@@ -57,27 +57,14 @@ public class InputWindow : LLClickable
     {
         rectTransform = GetComponent<RectTransform>();
         rectTransform.anchoredPosition = new Vector2(savedPosition.Value.x, savedPosition.Value.y);
-        
-        lbHeader = LLControl.CreatePanel(rectTransform, "lbHeader").gameObject.AddComponent<TextMeshProUGUI>();
+
+        lbHeader = rectTransform.Find("Header").gameObject.AddComponent<TextMeshProUGUI>();
         lbHeader.alignment = TextAlignmentOptions.Center;
         lbHeader.fontSize = 20;
-        if (isMiniSize)
-        {
-            lbHeader.rectTransform.localPosition = new Vector2(-42f, 41f);
-            lbHeader.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 80f);
-            lbHeader.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 34f);
-            TextHandler.SetText(lbHeader, "Inputs");
-        }
-        else
-        {
-            lbHeader.rectTransform.localPosition = new Vector2(-65f, 41f);
-            lbHeader.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 170f);
-            lbHeader.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 34f);
-            TextHandler.SetText(lbHeader, "Input Viewer");
-        }
+        TextHandler.SetText(lbHeader, isMiniSize ? "Inputs" : "Input Viewer");
 
         imgStripe = rectTransform.Find("Stripe").GetComponent<Image>();
-
+        
         Transform tfMovement = rectTransform.Find("Movement");
         inputJump = tfMovement.Find("Jump").gameObject.AddComponent<InputDisplay>();
         inputJump.Init("JumpOn", "JumpOff");
