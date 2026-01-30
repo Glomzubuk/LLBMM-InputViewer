@@ -78,7 +78,7 @@ namespace InputViewer
             enableLocalViewer = Config.Bind<bool>("Toggles", "enableLocalViewer", false);
             trackLocalCPUs = Config.Bind<bool>("Toggles", "trackLocalCPUs", true);
 
-            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition", new Vector2(-520f, -300f));
+            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition_main", new Vector2(-520f, -300f));
             
             inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(-520f, -300f));
             inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(520f, -300f));
