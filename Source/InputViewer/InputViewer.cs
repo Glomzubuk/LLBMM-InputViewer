@@ -1,70 +1,153 @@
-﻿using LLHandlers;
-using LLModdingTools;
+﻿using System;
+using System.Collections.Generic;
 using LLScreen;
 using UnityEngine;
+using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
+using LLBML;
+using LLBML.Players;
+using LLBML.States;
+using LLBML.Networking;
+using LLBML.Utils;
+using LLGUI;
 
 namespace InputViewer
 {
-    class InputViewer : MonoBehaviour
+    [BepInPlugin(PluginInfos.PLUGIN_ID, PluginInfos.PLUGIN_NAME, PluginInfos.PLUGIN_VERSION)]
+    [BepInDependency(LLBML.PluginInfos.PLUGIN_ID, BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency("no.mrgentle.plugins.llb.modmenu", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInProcess("LLBlaze.exe")]
+    class InputViewer : BaseUnityPlugin
     {
 
-#pragma warning disable IDE0051 // Remove unused private members
-        public const string modVersion = "1.2.0";
-        private const string repositoryOwner = "Daioutzu";
-        private const string repositoryName = "LLBMM-InputViewer";
-#pragma warning restore IDE0051
-
         public static InputViewer Instance { get; private set; } = null;
-        public static ModMenuIntegration MMI = null;
-        private bool modIntegrated;
-        public static void Initialize()
-        {
-            GameObject gameObject = new GameObject("InputViewer"); //The game object is what we use to interact with our mod
-            Instance = gameObject.AddComponent<InputViewer>();
-            Instance.tag = "InputViewer";
-            DontDestroyOnLoad(gameObject); // Makes sure our game object isn't destroyed
-            IVStyle.ATInit();
-        }
+        public static ManualLogSource LogGlobal { get; private set; }
 
-        static JOFJHDJHJGI CurrentGameState => DNPFJHMAIBP.HHMOGKIMBNM();
-        static GameMode CurrentGameMode => JOMBNFKIHIC.GIGAKBJGFDI.PNJOKAICMNN;
-        static bool IsOnline => JOMBNFKIHIC.GDNFJCCCKDM;
+        private RectTransform inputWindowContainer;
+        private InputWindow inputWindowMain;
+        private InputWindow inputWindow1v1Left;
+        private InputWindow inputWindow1v1Right;
+        private InputWindow inputWindowFfaP1;
+        private InputWindow inputWindowFfaP2;
+        private InputWindow inputWindowFfaP3;
+        private InputWindow inputWindowFfaP4;
+        private InputWindow[] PlayerInputWindows;
+        private InputWindow[] AllInputWindows;
+
+        private bool inputWindowsCreated = false;
+
+        private float saveTimer;
+
+        public ConfigEntry<int> selectViewingMode;
+        public ConfigEntry<int> backgroundTransparency;
+        public ConfigEntry<bool> excludeExpressions;
+        public ConfigEntry<bool> useTeamColors;
+
+        public ConfigEntry<bool> enableLocalViewer;
+        public ConfigEntry<bool> trackLocalCPUs;
+
+        public ConfigEntry<Vector2> inputViewerPosition_main;
+        public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
+        public ConfigEntry<Vector2> inputViewerPosition_1v1_right;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P1;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P2;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P3;
+        public ConfigEntry<Vector2> inputViewerPosition_FFA_P4;
+
+        void ConfigInit()
+        {
+            selectViewingMode = Config.Bind<int>("General", "selectViewingMode", 4,
+                new ConfigDescription("Viewing mode index", new AcceptableValueRange<int>(0, 4)));
+            backgroundTransparency = Config.Bind<int>("General", "backgroundTransparency", 0,
+                new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
+
+            excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
+
+            useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
+
+            Config.Bind("gap", "mm_header_gap", 20, new ConfigDescription("", null, "modmenu_gap"));
+            Config.Bind("localViewer", "mm_header_localViewer", "Local Viewer",
+                new ConfigDescription("", null, "modmenu_header"));
+            enableLocalViewer = Config.Bind<bool>("Toggles", "enableLocalViewer", false);
+            trackLocalCPUs = Config.Bind<bool>("Toggles", "trackLocalCPUs", true);
+
+            inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition_main", new Vector2(-520f, -300f));
+
+            inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(-520f, -300f));
+            inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(520f, -300f));
+
+            inputViewerPosition_FFA_P1 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P1",
+                new Vector2(-570f, -300f));
+            inputViewerPosition_FFA_P2 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P2",
+                new Vector2(-450f, -300f));
+            inputViewerPosition_FFA_P3 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P3",
+                new Vector2(450f, -300f));
+            inputViewerPosition_FFA_P4 = Config.Bind<Vector2>("Position", "inputViewerPosition_FFA_P4",
+                new Vector2(570f, -300f));
+        }
 
         void Awake()
         {
-            SaveSystem.Init();
+            Instance = this;
+            LogGlobal = Logger;
+            IVStyle.ATInit();
+            ConfigInit();
+            Config.SettingChanged += SettingChanged;
+        }
+
+        // API endpoint for other mods (e.g. spectate/replay mod)
+        public bool ForceLocalViewers()
+        {
+            return false;
+        }
+
+        private void CreateInputWindows()
+        {
+            inputWindowContainer = LLControl.CreatePanel(UIScreen.tfUIRoot, "Input Windows", 0, 0);
+            inputWindowContainer.anchorMin = new Vector2(0f, 0f);
+            inputWindowContainer.anchorMax = new Vector2(1f, 1f);
+            inputWindowContainer.localPosition = Vector2.zero;
+
+            inputWindow1v1Left = InputWindow.Create(inputWindowContainer, "inputWindow1v1Left", inputViewerPosition_1v1_left, false, false);
+            inputWindow1v1Right = InputWindow.Create(inputWindowContainer, "inputWindow1v1Right", inputViewerPosition_1v1_right, false, false);
+
+            inputWindowFfaP1 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP1", inputViewerPosition_FFA_P1, true, false);
+            inputWindowFfaP2 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP2", inputViewerPosition_FFA_P2, true, false);
+            inputWindowFfaP3 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP3", inputViewerPosition_FFA_P3, true, false);
+            inputWindowFfaP4 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP4", inputViewerPosition_FFA_P4, true, false);
+
+            inputWindowMain = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
+
+            PlayerInputWindows = new[] {inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4};
+            AllInputWindows = new[] {inputWindowMain, inputWindow1v1Left, inputWindow1v1Right, inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4};
+
+            inputWindowsCreated = true;
         }
 
         private void Start()
         {
-            Debug.Log("[LLBMM] InputViewer Started");
-            if (MMI == null) { MMI = gameObject.AddComponent<ModMenuIntegration>(); Debug.Log("[LLBMM] InputViewer: Added GameObject \"ModMenuIntegration\""); }
-            Load_InputViewerPosition();
+            Logger.LogInfo("InputViewer Started");
+            ModDependenciesUtils.RegisterToModMenu(this.Info, new List<String> {
+                "<b>Select View Mode Index</b>:",
+                "0 : <b>Off</b>",
+                "1 : <b>Training Mode</b>",
+                "2 : <b>Local Games</b>",
+                "3 : <b>Online Games</b>",
+                "4 : <b>All Games</b>",
+                "",
+                "<b>Enable local viewer</b>: shows an individual input viewer window for each player in LAN games",
+                "Local viewer windows are not draggable to prevent accidental moving, and each have their own saved position in the config"
+            });
         }
 
         private void OnDestroy()
         {
-            Debug.Log("[LLBMM] InputViewer Destroyed");
+            Logger.LogInfo("InputViewer Destroyed");
         }
 
-        bool InGame => World.instance != null && (CurrentGameState == JOFJHDJHJGI.CDOFDJMLGLO || CurrentGameState == JOFJHDJHJGI.LGILIJKMKOD) && !UIScreen.loadingScreenActive;
-        float selectViewingMode = 4;
-        public int BackgroundTransparency { get; private set; }
-        bool scaleToResolution = false;
-        public bool excludeExpressions = false;
+        bool InGame => World.instance != null && (GameStates.GetCurrent() == GameState.GAME || GameStates.GetCurrent() == GameState.GAME_PAUSE) && !UIScreen.loadingScreenActive;
 
-        void ModMenuInit()
-        {
-            if ((MMI != null && !modIntegrated) || LLModMenu.ModMenu.Instance.currentOpenMod == "InputViewer")
-            {
-                selectViewingMode = MMI.GetSliderValue("(slider)selectViewingMode");
-                excludeExpressions = MMI.GetTrueFalse(MMI.configBools["(bool)miniInputViewer"]);
-                BackgroundTransparency = MMI.GetSliderValue("(slider)backgroundTransparency");
-                scaleToResolution = MMI.GetTrueFalse(MMI.configBools["(bool)scaleWithResolution"]);
-                if (!modIntegrated) { Debug.Log("[LLBMM] InputViewer: ModMenuIntegration Done"); };
-                modIntegrated = true;
-            }
-        }
 #if DEBUG
         //Method to Log all the active game objects
         void PrintAllGameObjects()
@@ -79,144 +162,100 @@ namespace InputViewer
         }
 #endif
 
-        void Auto_Save()
+        private void SettingChanged(object sender, SettingChangedEventArgs e)
         {
-            if (inputRect.position != posUpdated)
+
+            if (inputWindowMain.isMiniSize != excludeExpressions.Value)
             {
-                saveTimer += Time.deltaTime;
-                if (CountDown(ref saveTimer, 5f))
+                InputWindow windowOld = inputWindowMain;
+                InputWindow windowNew = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
+                windowNew.BindPlayer(windowOld.boundPlayer);
+
+                Destroy(windowOld.gameObject);
+                inputWindowMain = windowNew;
+                AllInputWindows[0] = inputWindowMain;
+            }
+        }
+
+        private bool queueSave;
+        void LateUpdate()
+        {
+            if (AllInputWindows == null) return;
+            foreach (InputWindow window in AllInputWindows)
+            {
+                window.UpdateColor();
+            }
+
+            if (ModDependenciesUtils.InModOptions())
+            {
+                if (inputWindowMain.IsPositionUnsaved()) queueSave = true;
+            }
+            else if (queueSave)
+            {
+                inputWindowMain.SavePosition();
+                Config.Save();
+                LogGlobal.LogInfo("Saved InputViewer position");
+                queueSave = false;
+            }
+        }
+
+        private void Update()
+        {
+            if (!inputWindowsCreated)
+            {
+                if (UIScreen.tfUIRoot != null) CreateInputWindows();
+            }
+
+            if (!inputWindowsCreated) return;
+
+            inputWindowContainer.SetAsLastSibling();
+            foreach (InputWindow window in AllInputWindows)
+            {
+                window.gameObject.SetActive(false);
+            }
+
+            int localPlayerCount = LocalPlayerCount;
+
+            // training, local with CPUs, online
+            if (( (localPlayerCount == 1 || StateApi.CurrentGameMode == GameMode.TRAINING || (!enableLocalViewer.Value && !ForceLocalViewers())) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
+            {
+                inputWindowMain.BindPlayer(GetFirstLocalPlayer(false));
+
+                inputWindowMain.gameObject.SetActive(true);
+                return;
+            }
+
+            if (!enableLocalViewer.Value && !ForceLocalViewers())
+            {
+                return;
+            }
+
+            if (localPlayerCount == 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
+            {
+                Player leftPLayer = GetFirstLocalPlayer(true);
+                Player rightPlayer = GetSecondLocalPlayer(leftPLayer, true);
+
+                inputWindow1v1Left.BindPlayer(leftPLayer);
+                inputWindow1v1Right.BindPlayer(rightPlayer);
+
+                inputWindow1v1Left.gameObject.SetActive(!(leftPLayer.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
+                inputWindow1v1Right.gameObject.SetActive(!(rightPlayer.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
+            }
+            else if (localPlayerCount > 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
+            {
+                for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
                 {
-                    Save_InputViewerPosition();
-                    posUpdated = inputRect.position;
+                    Player player = Player.GetPlayer(playerIndex);
+
+                    if (!IsLocalPlayer(player, true))
+                    {
+                        continue;
+                    }
+
+                    InputWindow window = PlayerInputWindows[playerIndex];
+                    window.BindPlayer(player);
+                    window.gameObject.SetActive(!(player.IsAI && !trackLocalCPUs.Value && !ForceLocalViewers()));
                 }
-            }
-        }
-
-        void Save_InputViewerPosition()
-        {
-            SaveData save = new SaveData
-            {
-                inputViwerPos = inputRect.position,
-            };
-            string json = JsonUtility.ToJson(save);
-            SaveSystem.Save(json);
-            Debug.Log("[LLBMM] Saved");
-        }
-        void Load_InputViewerPosition(bool isReload = false)
-        {
-            string saveString = SaveSystem.Load();
-            if (saveString != null)
-            {
-                SaveData saveLoad = JsonUtility.FromJson<SaveData>(saveString);
-                posUpdated = inputRect.position = saveLoad.inputViwerPos;
-                Debug.Log("[LLBMM] InputViewer: Loaded Overlay Position");
-            }
-            else if (isReload == false)
-            {
-                string json = JsonUtility.ToJson(new SaveData());
-                SaveSystem.Save(json);
-                Debug.Log("[LLBMM] InputViewer: Default Save Data Created");
-                Load_InputViewerPosition(true);
-            }
-            else
-            {
-                Debug.Log("[LLBMM] (Debug) InputViewer: Load Failed");
-            }
-        }
-
-        Vector2 posUpdated;
-        float saveTimer;
-
-        static bool CountDown(ref float timer, float duration)
-        {
-            if (timer > 0 && timer < duration) // Cooldown in seconds
-            {
-                timer += Time.deltaTime;
-            }
-            else
-            {
-                timer = 0;
-            }
-            return timer == 0;
-        }
-
-        void Update()
-        {
-            ModMenuInit();
-            Auto_Save();
-#if DEBUG
-            if (Input.GetKeyDown(KeyCode.Keypad7))
-            {
-                Save_InputViewerPosition();
-            }
-
-            if (Input.GetKeyDown(KeyCode.Keypad8))
-            {
-                Load_InputViewerPosition();
-            }
-#endif
-
-            //Experimental Code - not much to see here.
-#if DEBUG
-            if (Input.GetKeyDown(KeyCode.Alpha9))
-            {
-                Cursor.visible = !Cursor.visible;
-                GameObject header = new GameObject("header", typeof(Image), typeof(LayoutElement));
-                GameObject body = new GameObject("body", typeof(Image), typeof(LayoutElement));
-                GameObject frame = new GameObject("frame", typeof(VerticalLayoutGroup));
-                GameObject panel = new GameObject("panel", typeof(Image));
-                GameObject canvas = new GameObject("canvas", typeof(Canvas), typeof(CanvasScaler));
-
-                panel.transform.SetParent(canvas.transform);
-                frame.transform.SetParent(panel.transform);
-                header.transform.SetParent(frame.transform);
-                body.transform.SetParent(frame.transform);
-
-                header.GetComponent<LayoutElement>().minHeight = 50;
-                body.GetComponent<LayoutElement>().minHeight = 100;
-                body.GetComponent<LayoutElement>().preferredHeight = 999;
-
-                canvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-                canvas.GetComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                canvas.GetComponent<CanvasScaler>().matchWidthOrHeight = 0.5f;
-                canvas.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1280, 720);
-
-                panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.5f);
-                panel.GetComponent<RectTransform>().anchorMin = new Vector2(0, 0);
-                panel.GetComponent<RectTransform>().anchorMax = new Vector2(1, 1);
-                panel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
-
-                RectTransform frameRect = frame.GetComponent<RectTransform>();
-                VerticalLayoutGroup frameVertGroup = frame.GetComponent<VerticalLayoutGroup>();
-                frameRect.anchorMin = new Vector2(0, 0);
-                frameRect.anchorMax = new Vector2(0, 0);
-                frameRect.pivot = new Vector2(0.5f, 0.5f);
-                frameRect.sizeDelta = new Vector2(550, 300);
-                frameRect.position = new Vector2(300, 203);
-                frameVertGroup.spacing = 10;
-                frameVertGroup.childControlHeight = true;
-                frameVertGroup.childControlWidth = true;
-                frameVertGroup.childForceExpandHeight = true;
-                frameVertGroup.childForceExpandWidth = true;
-            }
-#endif
-        }
-
-        Vector2 inputSizeMini = new Vector2(165, 117);
-        Vector2 inputSize = new Vector2(300, 117);
-        Rect inputRect = new Rect(30, GUITools.GUI_Height - 147, 300, 117);
-
-        void OnGUI()
-        {
-            if (scaleToResolution)
-            {
-                GUITools.ScaleGUIToViewPort();
-            }
-            if (ViewingMode((ViewMode)selectViewingMode) || LLModMenu.ModMenu.Instance.inModOptions)
-            {
-                inputRect.size = excludeExpressions ? inputSizeMini : inputSize;
-
-                inputRect = GUILayout.Window(102289, inputRect, InputWindow, "", IVStyle.InputViewerBG);
             }
         }
 
@@ -224,21 +263,9 @@ namespace InputViewer
         {
             Off,
             Training,
-            local,
+            Local,
             Online,
             All,
-        }
-
-        enum GameState
-        {
-            LOBBY_STORY = 23,
-            LOBBY_TUTORIAL = 12,
-            LOBBY_TRAINING = 11,
-            LOBBY_CHALLENGE = 6,
-            LOBBY_LOCAL = 4,
-            GAME = 19,
-            GAME_PAUSE = 20,
-            LOBBY_ONLINE = 5,
         }
 
         bool ViewingMode(ViewMode selectedView)
@@ -248,110 +275,75 @@ namespace InputViewer
                 case ViewMode.Off:
                     return false;
                 case ViewMode.Training:
-                    return CurrentGameMode == GameMode.TRAINING && InGame;
-                case ViewMode.local:
-                    return !IsOnline && InGame;
+                    return StateApi.CurrentGameMode == GameMode.TRAINING;
+                case ViewMode.Local:
+                    return !NetworkApi.IsOnline;
                 case ViewMode.Online:
-                    return IsOnline && InGame;
+                    return NetworkApi.IsOnline;
                 case ViewMode.All:
-                    return InGame;
+                    return true;
                 default:
                     return false;
             }
         }
 
-        void InputWindow(int wId)
+        private bool IsLocalPlayer(Player player, bool allowCPUs)
         {
-            int index = 0;
-            for (int i = 0; i < 4; i++)
+            bool isLocal = player.IsLocalPeer && player.IsInMatch;
+            bool blockAI = player.IsAI && !allowCPUs;
+            return isLocal && (!blockAI || ForceLocalViewers());
+        }
+
+        private int LocalPlayerCount
+        {
+            get
             {
-                if (ALDOKEMAOMB.BJDPHEHJJJK(i).GAFCIHKIGNM && ALDOKEMAOMB.BJDPHEHJJJK(i).NGLDMOLLPLK)
+                int count = 0;
+
+                for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
                 {
-                    index = i;
-                    i = 4;
+                    Player player = Player.GetPlayer(playerIndex);
+
+                    if (IsLocalPlayer(player, true))
+                    {
+                        count++;
+                    }
                 }
-            };
-            ALDOKEMAOMB player = ALDOKEMAOMB.BJDPHEHJJJK(index);
 
-            GUIStyle headerStyle = new GUIStyle(GUI.skin.label)
-            {
-                font = IVStyle.inputViewerFont,
-                fontSize = 20,
-                alignment = TextAnchor.MiddleLeft,
-                margin = new RectOffset(5, 5, 6, 16),
-                padding = new RectOffset(0, 0, 0, 0),
-                wordWrap = false,
-                clipping = TextClipping.Overflow,
-            };
-
-            GUIStyle border = new GUIStyle()
-            {
-                padding = new RectOffset(3, 3, 0, 0),
-            };
-
-            GUI.DragWindow();
-            GUILayoutOption[] gUILayoutOption = new GUILayoutOption[]
-            {
-                GUILayout.MinWidth(inputRect.size.x),
-                GUILayout.MinHeight(inputRect.size.y),
-                GUILayout.MaxWidth(inputRect.size.x),
-                GUILayout.MaxHeight(inputRect.size.y),
-            };
-            GUILayout.BeginHorizontal(border, gUILayoutOption);
-
-            GUILayout.BeginVertical();
-            GUILayout.Label("Input Viewer", headerStyle);
-            GUILayout.BeginHorizontal();
-
-            GUILayout.BeginVertical();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.JUMP)] == 100, "", IVStyle.JumpStyle);
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.UP)] == 100, "", IVStyle.DirUpStyle);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.LEFT)] == 100, "", IVStyle.DirLefStyle);
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.DOWN)] == 100, "", IVStyle.DirDwnStyle);
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.RIGHT)] == 100, "", IVStyle.DirRigStyle);
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.SWING)] == 100, "", IVStyle.SwingStyle); //Swing Button
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.BUNT)] == 100, "", IVStyle.BuntStyle); //Bunt Button
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.GRAB)] == 100, "", IVStyle.GrabStyle); //Grab Button
-            GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.TAUNT)] == 100, "", IVStyle.TauntStyle); //Taunt Button
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
-
-            GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
-            if (excludeExpressions == false)
-            {
-                GUILayout.BeginVertical();
-                GUILayout.FlexibleSpace();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_UP)] == 100, "", IVStyle.ExpNiceStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_LEFT)] == 100, "", IVStyle.ExpOopsStyle);
-                GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_RIGHT)] == 100, "", IVStyle.ExpWowStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Toggle(InputHandler.currentInput[player.CJFLMDNNMIE, InputAction.ActionToIndex(InputAction.EXPRESS_DOWN)] == 100, "", IVStyle.ExpBringItStyle);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.EndVertical();
+                return count;
             }
-            GUILayout.EndHorizontal();
+        }
+
+        private Player GetFirstLocalPlayer(bool allowCPUs)
+        {
+            Player localPlayer = Player.GetPlayer(0);
+            for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
+            {
+                Player tempPlayer = Player.GetPlayer(playerIndex);
+                if (IsLocalPlayer(tempPlayer, allowCPUs))
+                {
+                    localPlayer = tempPlayer;
+                    break;
+                }
+            }
+
+            return localPlayer;
+        }
+
+        private Player GetSecondLocalPlayer(Player firstPlayer, bool allowCPUs)
+        {
+            Player localPlayer = Player.GetPlayer(0);
+            for (int playerIndex = firstPlayer.nr + 1; playerIndex < Player.MAX_PLAYERS; playerIndex++)
+            {
+                Player tempPlayer = Player.GetPlayer(playerIndex);
+                if (IsLocalPlayer(tempPlayer, allowCPUs))
+                {
+                    localPlayer = tempPlayer;
+                    break;
+                }
+            }
+
+            return localPlayer;
         }
 
     }
