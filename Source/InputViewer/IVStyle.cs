@@ -18,13 +18,6 @@ namespace InputViewer
         public static Dictionary<string, Sprite> uiSprites = new Dictionary<string, Sprite>();
         public static Texture2D viewerBG;
 
-        public static readonly Color[] DefaultTeamColors = {
-            new Color(255/255f, 64/255f, 22/255f),
-            new Color(13/255f, 136/255f, 255/255f),
-            new Color(255/255f, 255/255f, 61/255f),
-            new Color(90/255f, 244/255f, 90/255f)
-        };
-        public static Color[] TeamColors = new Color[4];
         private static string[] transparencyNames = {"", "_90", "_80", "_70", "_60", "_50"};
 
         static void LoadAssets()
@@ -38,11 +31,6 @@ namespace InputViewer
             uiTexture2DAssets.Add("BlankTexture", new Texture2D(0, 0));
             inputViewerFont = uiBundle.LoadAsset<Font>("assets/ui/elements.ttf");
             //foreach (var s in IVStyle.uiTexture2DAssets) Debug.Log(s.Key);
-
-            for (int teamColorIndex = 0; teamColorIndex < DefaultTeamColors.Length; teamColorIndex++)
-            {
-                TeamColors[teamColorIndex] = DefaultTeamColors[teamColorIndex];
-            }
 
             GameObject[] gameObjects = uiBundle.LoadAllAssets<GameObject>();
             for (int i = 0; i < gameObjects.Length; i++)
@@ -63,16 +51,5 @@ namespace InputViewer
         {
             LoadAssets();
         }
-
-        public static void UpdateTeamColors(Color[] newTeamColors)
-        {
-            for (int teamColorIndex = 0; teamColorIndex < TeamColors.Length; teamColorIndex++)
-            {
-                TeamColors[teamColorIndex] = newTeamColors[teamColorIndex] != Color.clear
-                    ? newTeamColors[teamColorIndex]
-                    : DefaultTeamColors[teamColorIndex];
-            }
-        }
-
     }
 }

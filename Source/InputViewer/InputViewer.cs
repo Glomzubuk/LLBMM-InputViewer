@@ -17,13 +17,9 @@ namespace InputViewer
     [BepInPlugin(PluginInfos.PLUGIN_ID, PluginInfos.PLUGIN_NAME, PluginInfos.PLUGIN_VERSION)]
     [BepInDependency(LLBML.PluginInfos.PLUGIN_ID, BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("no.mrgentle.plugins.llb.modmenu", BepInDependency.DependencyFlags.SoftDependency)]
-    [BepInDependency(DEPENDENCY_COLORSWAP, BepInDependency.DependencyFlags.SoftDependency)]
     [BepInProcess("LLBlaze.exe")]
     class InputViewer : BaseUnityPlugin
     {
-
-        public const string DEPENDENCY_COLORSWAP = "com.gitlab.axolotlll.llb-colorswap";
-        public BaseUnityPlugin ColorSwapPlugin = null;
 
         public static InputViewer Instance { get; private set; } = null;
         public static ManualLogSource LogGlobal { get; private set; }
@@ -47,7 +43,6 @@ namespace InputViewer
         public ConfigEntry<int> backgroundTransparency;
         public ConfigEntry<bool> excludeExpressions;
         public ConfigEntry<bool> useTeamColors;
-        public ConfigEntry<bool> enableColorSwapIntegration;
 
         public ConfigEntry<bool> enableLocalViewer;
         public ConfigEntry<bool> trackLocalCPUs;
@@ -70,7 +65,6 @@ namespace InputViewer
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
 
             useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
-            enableColorSwapIntegration = Config.Bind<bool>("Toggles", "enableColorSwapIntegration", true);
 
             Config.Bind("gap", "mm_header_gap", 20, new ConfigDescription("", null, "modmenu_gap"));
             Config.Bind("localViewer", "mm_header_localViewer", "Local Viewer",
@@ -145,19 +139,6 @@ namespace InputViewer
                 "<b>Enable local viewer</b>: shows an individual input viewer window for each player in LAN games",
                 "Local viewer windows are not draggable to prevent accidental moving, and each have their own saved position in the config"
             });
-
-            if (ModDependenciesUtils.IsModLoaded(DEPENDENCY_COLORSWAP) && ColorSwapPlugin == null)
-            {
-                ColorSwapPlugin = BepInEx.Bootstrap.Chainloader.PluginInfos[DEPENDENCY_COLORSWAP]?.Instance;
-
-                if (ColorSwapPlugin != null)
-                {
-                    Logger.LogInfo("Found soft dependency ColorSwap");
-                    ColorSwapPlugin.Config.SettingChanged += ColorSwap_SettingChanged;
-
-                    ColorSwap_UpdateTeamColors();
-                }
-            }
         }
 
         private void OnDestroy()
@@ -181,66 +162,8 @@ namespace InputViewer
         }
 #endif
 
-        private ConfigEntry<bool> colorSwap_p1Enabled;
-        private ConfigEntry<int> colorSwap_p1R;
-        private ConfigEntry<int> colorSwap_p1G;
-        private ConfigEntry<int> colorSwap_p1B;
-
-        private ConfigEntry<bool> colorSwap_p2Enabled;
-        private ConfigEntry<int> colorSwap_p2R;
-        private ConfigEntry<int> colorSwap_p2G;
-        private ConfigEntry<int> colorSwap_p2B;
-
-        private ConfigEntry<bool> colorSwap_p3Enabled;
-        private ConfigEntry<int> colorSwap_p3R;
-        private ConfigEntry<int> colorSwap_p3G;
-        private ConfigEntry<int> colorSwap_p3B;
-
-        private ConfigEntry<bool> colorSwap_p4Enabled;
-        private ConfigEntry<int> colorSwap_p4R;
-        private ConfigEntry<int> colorSwap_p4G;
-        private ConfigEntry<int> colorSwap_p4B;
-
-        private void ColorSwap_SettingChanged(object sender, SettingChangedEventArgs e)
-        {
-            ColorSwap_UpdateTeamColors();
-        }
-
-        private void ColorSwap_UpdateTeamColors()
-        {
-            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p1Enabled", out colorSwap_p1Enabled);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1R", out colorSwap_p1R);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1G", out colorSwap_p1G);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1B", out colorSwap_p1B);
-            Color p1Color = colorSwap_p1Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p1R.Value/255f, colorSwap_p1G.Value/255f, colorSwap_p1B.Value/255f) : Color.clear;
-
-            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p2Enabled", out colorSwap_p2Enabled);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2R", out colorSwap_p2R);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2G", out colorSwap_p2G);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2B", out colorSwap_p2B);
-            Color p2Color = colorSwap_p2Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p2R.Value/255f, colorSwap_p2G.Value/255f, colorSwap_p2B.Value/255f) : Color.clear;
-
-            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p3Enabled", out colorSwap_p3Enabled);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3R", out colorSwap_p3R);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3G", out colorSwap_p3G);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3B", out colorSwap_p3B);
-            Color p3Color = colorSwap_p3Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p3R.Value/255f, colorSwap_p3G.Value/255f, colorSwap_p3B.Value/255f) : Color.clear;
-
-            ColorSwapPlugin.Config.TryGetEntry("Toggles", "p4Enabled", out colorSwap_p4Enabled);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4R", out colorSwap_p4R);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4G", out colorSwap_p4G);
-            ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4B", out colorSwap_p4B);
-            Color p4Color = colorSwap_p4Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p4R.Value/255f, colorSwap_p4G.Value/255f, colorSwap_p4B.Value/255f) : Color.clear;
-
-            IVStyle.UpdateTeamColors(new[] {p1Color, p2Color, p3Color, p4Color});
-        }
-
         private void SettingChanged(object sender, SettingChangedEventArgs e)
         {
-            if (ColorSwapPlugin != null)
-            {
-                ColorSwap_UpdateTeamColors();
-            }
 
             if (inputWindowMain.isMiniSize != excludeExpressions.Value)
             {

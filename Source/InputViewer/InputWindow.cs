@@ -117,7 +117,11 @@ namespace InputViewer
                 _ => 0f
             };
 
-            Color colorStripe = team == Team.NONE || !InputViewer.Instance.useTeamColors.Value ? Color.white : IVStyle.TeamColors[(int)team];
+            Color colorStripe = Color.white;
+            if (team != Team.NONE && InputViewer.Instance.useTeamColors.Value)
+            {
+                colorStripe = LLBML.Bundles.Assets.GetTeamColor(team);
+            }
             colorStripe.a = transparency;
             Color colorBg = Color.white;
             colorBg.a = transparency;
