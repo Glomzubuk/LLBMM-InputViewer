@@ -1,6 +1,16 @@
 ﻿using System.Reflection;
 using InputViewer;
 
+#region Assembly attributes
+/*
+ * These attributes define various metainformation of the generated DLL.
+ * In general, you don't need to touch these. Instead, edit the values in PluginInfos.
+ */
+[assembly: AssemblyVersion(PluginInfos.PLUGIN_VERSION)]
+[assembly: AssemblyTitle(PluginInfos.PLUGIN_NAME + " (" + PluginInfos.PLUGIN_ID + ")")]
+[assembly: AssemblyProduct(PluginInfos.PLUGIN_NAME)]
+#endregion
+
 namespace InputViewer
 {
     /// <summary>
@@ -15,7 +25,7 @@ namespace InputViewer
     {
         /// <summary>
         /// Human-readable name of the plugin. In general, it should be short and concise.
-        /// This is the name that is shown to the users who run BepInEx and to modders that inspect BepInEx logs. 
+        /// This is the name that is shown to the users who run BepInEx and to modders that inspect BepInEx logs.
         /// </summary>
         public const string PLUGIN_NAME = "InputViewer";
 
