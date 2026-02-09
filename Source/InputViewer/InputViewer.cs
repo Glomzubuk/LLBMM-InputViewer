@@ -125,8 +125,8 @@ namespace InputViewer
             
             inputWindowMain = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
 
-            PlayerInputWindows = [inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4];
-            AllInputWindows = [inputWindowMain, inputWindow1v1Left, inputWindow1v1Right, inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4];
+            PlayerInputWindows = new[] {inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4};
+            AllInputWindows = new[] {inputWindowMain, inputWindow1v1Left, inputWindow1v1Right, inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4};
 
             inputWindowsCreated = true;
         }
@@ -232,7 +232,7 @@ namespace InputViewer
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4B", out colorSwap_p4B);
             Color p4Color = colorSwap_p4Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p4R.Value/255f, colorSwap_p4G.Value/255f, colorSwap_p4B.Value/255f) : Color.clear;
             
-            IVStyle.UpdateTeamColors([p1Color, p2Color, p3Color, p4Color]);
+            IVStyle.UpdateTeamColors(new[] {p1Color, p2Color, p3Color, p4Color});
         }
         
         private void SettingChanged(object sender, SettingChangedEventArgs e)

@@ -8,7 +8,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace InputViewer;
+namespace InputViewer
+{
 
 public class InputWindow : LLClickable
 {
@@ -191,4 +192,5 @@ public class InputWindow : LLClickable
             isDragging = false;
         }
     }
+}
 }

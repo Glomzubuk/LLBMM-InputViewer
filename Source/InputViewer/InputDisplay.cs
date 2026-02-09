@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace InputViewer;
+namespace InputViewer
+{
 
 public class InputDisplay : MonoBehaviour
 {
@@ -24,4 +25,5 @@ public class InputDisplay : MonoBehaviour
     {
         image.sprite = state ? spriteOn : spriteOff;
     }
+}
 }
