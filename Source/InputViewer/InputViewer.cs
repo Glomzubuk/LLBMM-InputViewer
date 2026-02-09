@@ -24,7 +24,7 @@ namespace InputViewer
 
         public const string DEPENDENCY_COLORSWAP = "com.gitlab.axolotlll.llb-colorswap";
         public BaseUnityPlugin ColorSwapPlugin = null;
-        
+
         public static InputViewer Instance { get; private set; } = null;
         public static ManualLogSource LogGlobal { get; private set; }
 
@@ -42,7 +42,7 @@ namespace InputViewer
         private bool inputWindowsCreated = false;
 
         private float saveTimer;
-        
+
         public ConfigEntry<int> selectViewingMode;
         public ConfigEntry<int> backgroundTransparency;
         public ConfigEntry<bool> excludeExpressions;
@@ -51,7 +51,7 @@ namespace InputViewer
 
         public ConfigEntry<bool> enableLocalViewer;
         public ConfigEntry<bool> trackLocalCPUs;
-        
+
         public ConfigEntry<Vector2> inputViewerPosition_main;
         public ConfigEntry<Vector2> inputViewerPosition_1v1_left;
         public ConfigEntry<Vector2> inputViewerPosition_1v1_right;
@@ -68,7 +68,7 @@ namespace InputViewer
                 new ConfigDescription("Background transparency", new AcceptableValueRange<int>(0, 6)));
 
             excludeExpressions = Config.Bind<bool>("Toggles", "miniInputViewer", false);
-            
+
             useTeamColors = Config.Bind<bool>("Toggles", "useTeamColors", false);
             enableColorSwapIntegration = Config.Bind<bool>("Toggles", "enableColorSwapIntegration", true);
 
@@ -79,7 +79,7 @@ namespace InputViewer
             trackLocalCPUs = Config.Bind<bool>("Toggles", "trackLocalCPUs", true);
 
             inputViewerPosition_main = Config.Bind<Vector2>("Position", "inputViewerPosition_main", new Vector2(-520f, -300f));
-            
+
             inputViewerPosition_1v1_left = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_left", new Vector2(-520f, -300f));
             inputViewerPosition_1v1_right = Config.Bind<Vector2>("Position", "inputViewerPosition_1v1_right", new Vector2(520f, -300f));
 
@@ -114,15 +114,15 @@ namespace InputViewer
             inputWindowContainer.anchorMin = new Vector2(0f, 0f);
             inputWindowContainer.anchorMax = new Vector2(1f, 1f);
             inputWindowContainer.localPosition = Vector2.zero;
-            
+
             inputWindow1v1Left = InputWindow.Create(inputWindowContainer, "inputWindow1v1Left", inputViewerPosition_1v1_left, false, false);
             inputWindow1v1Right = InputWindow.Create(inputWindowContainer, "inputWindow1v1Right", inputViewerPosition_1v1_right, false, false);
-            
+
             inputWindowFfaP1 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP1", inputViewerPosition_FFA_P1, true, false);
             inputWindowFfaP2 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP2", inputViewerPosition_FFA_P2, true, false);
             inputWindowFfaP3 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP3", inputViewerPosition_FFA_P3, true, false);
             inputWindowFfaP4 = InputWindow.Create(inputWindowContainer, "inputWindowFfaP4", inputViewerPosition_FFA_P4, true, false);
-            
+
             inputWindowMain = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
 
             PlayerInputWindows = new[] {inputWindowFfaP1, inputWindowFfaP2, inputWindowFfaP3, inputWindowFfaP4};
@@ -154,7 +154,7 @@ namespace InputViewer
                 {
                     Logger.LogInfo("Found soft dependency ColorSwap");
                     ColorSwapPlugin.Config.SettingChanged += ColorSwap_SettingChanged;
-                    
+
                     ColorSwap_UpdateTeamColors();
                 }
             }
@@ -166,7 +166,7 @@ namespace InputViewer
         }
 
         bool InGame => World.instance != null && (GameStates.GetCurrent() == GameState.GAME || GameStates.GetCurrent() == GameState.GAME_PAUSE) && !UIScreen.loadingScreenActive;
-        
+
 #if DEBUG
         //Method to Log all the active game objects
         void PrintAllGameObjects()
@@ -190,12 +190,12 @@ namespace InputViewer
         private ConfigEntry<int> colorSwap_p2R;
         private ConfigEntry<int> colorSwap_p2G;
         private ConfigEntry<int> colorSwap_p2B;
-        
+
         private ConfigEntry<bool> colorSwap_p3Enabled;
         private ConfigEntry<int> colorSwap_p3R;
         private ConfigEntry<int> colorSwap_p3G;
         private ConfigEntry<int> colorSwap_p3B;
-        
+
         private ConfigEntry<bool> colorSwap_p4Enabled;
         private ConfigEntry<int> colorSwap_p4R;
         private ConfigEntry<int> colorSwap_p4G;
@@ -213,28 +213,28 @@ namespace InputViewer
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1G", out colorSwap_p1G);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p1B", out colorSwap_p1B);
             Color p1Color = colorSwap_p1Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p1R.Value/255f, colorSwap_p1G.Value/255f, colorSwap_p1B.Value/255f) : Color.clear;
-            
+
             ColorSwapPlugin.Config.TryGetEntry("Toggles", "p2Enabled", out colorSwap_p2Enabled);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2R", out colorSwap_p2R);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2G", out colorSwap_p2G);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p2B", out colorSwap_p2B);
             Color p2Color = colorSwap_p2Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p2R.Value/255f, colorSwap_p2G.Value/255f, colorSwap_p2B.Value/255f) : Color.clear;
-            
+
             ColorSwapPlugin.Config.TryGetEntry("Toggles", "p3Enabled", out colorSwap_p3Enabled);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3R", out colorSwap_p3R);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3G", out colorSwap_p3G);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p3B", out colorSwap_p3B);
             Color p3Color = colorSwap_p3Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p3R.Value/255f, colorSwap_p3G.Value/255f, colorSwap_p3B.Value/255f) : Color.clear;
-            
+
             ColorSwapPlugin.Config.TryGetEntry("Toggles", "p4Enabled", out colorSwap_p4Enabled);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4R", out colorSwap_p4R);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4G", out colorSwap_p4G);
             ColorSwapPlugin.Config.TryGetEntry("Tuning", "p4B", out colorSwap_p4B);
             Color p4Color = colorSwap_p4Enabled.Value && enableColorSwapIntegration.Value ? new Color(colorSwap_p4R.Value/255f, colorSwap_p4G.Value/255f, colorSwap_p4B.Value/255f) : Color.clear;
-            
+
             IVStyle.UpdateTeamColors(new[] {p1Color, p2Color, p3Color, p4Color});
         }
-        
+
         private void SettingChanged(object sender, SettingChangedEventArgs e)
         {
             if (ColorSwapPlugin != null)
@@ -247,7 +247,7 @@ namespace InputViewer
                 InputWindow windowOld = inputWindowMain;
                 InputWindow windowNew = InputWindow.Create(inputWindowContainer, "inputWindowMain", inputViewerPosition_main, excludeExpressions.Value, true);
                 windowNew.BindPlayer(windowOld.boundPlayer);
-                
+
                 Destroy(windowOld.gameObject);
                 inputWindowMain = windowNew;
                 AllInputWindows[0] = inputWindowMain;
@@ -282,7 +282,7 @@ namespace InputViewer
             {
                 if (UIScreen.tfUIRoot != null) CreateInputWindows();
             }
-            
+
             if (!inputWindowsCreated) return;
 
             inputWindowContainer.SetAsLastSibling();
@@ -290,14 +290,14 @@ namespace InputViewer
             {
                 window.gameObject.SetActive(false);
             }
-            
+
             int localPlayerCount = LocalPlayerCount;
 
             // training, local with CPUs, online
             if (( (localPlayerCount == 1 || StateApi.CurrentGameMode == GameMode.TRAINING || (!enableLocalViewer.Value && !ForceLocalViewers())) && ViewingMode((ViewMode)selectViewingMode.Value) && InGame) || ModDependenciesUtils.InModOptions())
             {
                 inputWindowMain.BindPlayer(GetFirstLocalPlayer(false));
-            
+
                 inputWindowMain.gameObject.SetActive(true);
                 return;
             }
@@ -306,12 +306,12 @@ namespace InputViewer
             {
                 return;
             }
-            
+
             if (localPlayerCount == 2 && ViewingMode((ViewMode)selectViewingMode.Value) && InGame)
             {
                 Player leftPLayer = GetFirstLocalPlayer(true);
                 Player rightPlayer = GetSecondLocalPlayer(leftPLayer, true);
-                
+
                 inputWindow1v1Left.BindPlayer(leftPLayer);
                 inputWindow1v1Right.BindPlayer(rightPlayer);
 
@@ -370,13 +370,13 @@ namespace InputViewer
             bool blockAI = player.IsAI && !allowCPUs;
             return isLocal && (!blockAI || ForceLocalViewers());
         }
-        
+
         private int LocalPlayerCount
         {
             get
             {
                 int count = 0;
-                
+
                 for (int playerIndex = 0; playerIndex < Player.MAX_PLAYERS; playerIndex++)
                 {
                     Player player = Player.GetPlayer(playerIndex);
@@ -406,7 +406,7 @@ namespace InputViewer
 
             return localPlayer;
         }
-        
+
         private Player GetSecondLocalPlayer(Player firstPlayer, bool allowCPUs)
         {
             Player localPlayer = Player.GetPlayer(0);

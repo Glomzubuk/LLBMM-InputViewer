@@ -3,27 +3,26 @@ using UnityEngine.UI;
 
 namespace InputViewer
 {
-
-public class InputDisplay : MonoBehaviour
-{
-    private Image image;
-    public Sprite spriteOn;
-    public Sprite spriteOff;
-
-    private void Awake()
+    public class InputDisplay : MonoBehaviour
     {
-        image = GetComponent<Image>();
-    }
+        private Image image;
+        public Sprite spriteOn;
+        public Sprite spriteOff;
 
-    public void Init(string on, string off)
-    {
-        spriteOn = IVStyle.uiSprites[on];
-        spriteOff = IVStyle.uiSprites[off];
-    }
+        private void Awake()
+        {
+            image = GetComponent<Image>();
+        }
 
-    public void SetState(bool state)
-    {
-        image.sprite = state ? spriteOn : spriteOff;
+        public void Init(string on, string off)
+        {
+            spriteOn = IVStyle.uiSprites[on];
+            spriteOff = IVStyle.uiSprites[off];
+        }
+
+        public void SetState(bool state)
+        {
+            image.sprite = state ? spriteOn : spriteOff;
+        }
     }
-}
 }
